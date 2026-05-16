@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  avatar        String?
+  storageQuota  BigInt    @default(10737418240) @map("storage_quota") // 10GB default
+  storageUsed   BigInt    @default(0) @map("storage_used")
+  trashSize     BigInt    @default(0) @map("trash_size")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  files         File[]
+  folders       Folder[]
+  refreshTokens RefreshToken[]
+  shares        Share[]
+  uploadSessions UploadSession[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Folder {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  parentId  String?   @map("parent_id")
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderToFolder")
+  files    File[]
+
+  @@unique([userId, parentId, name])
+  @@index([userId, deletedAt])
+  @@map("folders")
+}
+
+model File {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  folderId     String?  @map("folder_id")
+  originalName String   @map("original_name")
+  storedName   String   @unique @map("stored_name")
+  path         String
+  mimeType     String   @map("mime_type")
+  category     String   @default("unknown")
+  thumbnail        String?
+  thumbnailSmall   String?  @map("thumbnail_small")
+  thumbnailMedium  String?  @map("thumbnail_medium")
+  thumbnailLarge   String?  @map("thumbnail_large")
+  size             BigInt
+  hash             String?
+  refCount         Int      @default(1) @map("ref_count")
+  isFavorite       Boolean  @default(false) @map("is_favorite")
+  currentVersion   Int      @default(1) @map("current_version")
+  createdAt        DateTime @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at")
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder   Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  shares   Share[]
+  versions FileVersion[]
+
+  @@index([userId, deletedAt])
+  @@index([userId, folderId, deletedAt])
+  @@index([hash])
+  @@index([userId, hash])
+  @@index([userId, originalName])
+  @@index([userId, category])
+  @@index([userId, createdAt])
+  @@index([userId, size])
+  @@index([userId, isFavorite, deletedAt])
+  @@map("files")
+}
+
+model FileVersion {
+  id        String   @id @default(uuid())
+  fileId    String   @map("file_id")
+  version   Int
+  storedName String  @unique @map("stored_name")
+  path      String
+  size      BigInt
+  hash      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, version])
+  @@map("file_versions")
+}
+
+model Share {
+  id           String    @id @default(uuid())
+  fileId       String    @map("file_id")
+  userId       String    @map("user_id")
+  token        String    @unique
+  passwordHash String?   @map("password_hash")
+  expiresAt    DateTime? @map("expires_at")
+  views        Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  file  File  @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("shares")
+}
+
+model UploadSession {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  filename     String
+  mimeType     String   @map("mime_type")
+  totalSize    BigInt   @map("total_size")
+  chunkSize    Int      @default(5242880) @map("chunk_size") // 5MB default
+  totalChunks  Int      @map("total_chunks")
+  uploadedChunks Int    @default(0) @map("uploaded_chunks")
+  folderId     String?  @map("folder_id")
+  status       String   @default("pending") // pending, uploading, merging, completed, failed, cancelled
+  hash         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  completedAt  DateTime? @map("completed_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks UploadChunk[]
+
+  @@index([userId, status])
+  @@map("upload_sessions")
+}
+
+model UploadChunk {
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  chunkIndex   Int      @map("chunk_index")
+  path         String
+  size         BigInt
+  hash         String?
+  uploaded     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  session UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, chunkIndex])
+  @@map("upload_chunks")
+}
