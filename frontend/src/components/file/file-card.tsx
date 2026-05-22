@@ -173,11 +173,22 @@ export function FileCard({
 
   // Grid view
   if (viewMode === "grid") {
+    const getCategoryColor = (cat: string) => {
+      switch (cat?.toLowerCase()) {
+        case "images": return { text: "text-purple-400", glow: "glow-purple", iconBg: "bg-purple-500/5", border: "hover:border-purple-500/30" };
+        case "videos": return { text: "text-blue-400", glow: "glow-blue", iconBg: "bg-blue-500/5", border: "hover:border-blue-500/30" };
+        case "audio": return { text: "text-pink-400", glow: "glow-magenta", iconBg: "bg-pink-500/5", border: "hover:border-pink-500/30" };
+        case "documents": return { text: "text-emerald-400", glow: "glow-cyan", iconBg: "bg-emerald-500/5", border: "hover:border-emerald-500/30" };
+        default: return { text: "text-cyan-400", glow: "glow-cyan", iconBg: "bg-cyan-500/5", border: "hover:border-cyan-500/30" };
+      }
+    };
+    const catColor = getCategoryColor(file.category);
+
     return (
       <div
         className={cn(
-          "group relative rounded-sm border transition-all duration-150 cursor-pointer select-none",
-          isSelected ? "border-accent-sunset/50 bg-accent-sunset/5" : "border-hairline hover:border-body-mid bg-canvas-card",
+          "group relative rounded-2xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none h-full flex flex-col justify-between overflow-hidden",
+          isSelected ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.2)]" : "",
         )}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -186,50 +197,58 @@ export function FileCard({
         onDragStart={handleDragStart}
       >
         {/* Checkbox */}
-        <div className="absolute top-2.5 left-2.5 z-10">
+        <div className="absolute top-3 left-3 z-10">
           <div
             className={cn(
-              "w-4.5 h-4.5 rounded-sm border-2 flex items-center justify-center transition-all duration-150",
-              isSelected ? "bg-accent-sunset border-accent-sunset" : "border-body-mid/40 opacity-0 group-hover:opacity-100",
+              "w-4 h-4 rounded-md border flex items-center justify-center transition-all duration-150",
+              isSelected ? "bg-cyan-500 border-cyan-400" : "border-white/30 bg-black/40 opacity-0 group-hover:opacity-100",
             )}
           >
             {isSelected && (
-              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
           </div>
         </div>
 
         {/* Favorite star */}
-        <button onClick={toggleFavorite} className="absolute top-2.5 right-2.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Star className={cn("w-4 h-4", isFavorite ? "fill-yellow-400 text-yellow-400 opacity-100" : "text-body-mid")} style={isFavorite ? { opacity: 1 } : undefined} />
+        <button onClick={toggleFavorite} className="absolute top-3 right-9 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Star className={cn("w-3.5 h-3.5", isFavorite ? "fill-yellow-400 text-yellow-400 opacity-100 animate-pulse" : "text-white/40 hover:text-white")} />
         </button>
 
         {/* 3-dot menu */}
         <button
           onClick={(e) => { e.stopPropagation(); handleContextMenu(e); }}
-          className="absolute top-2.5 right-8 z-10 p-1 rounded-sm bg-canvas-card/80 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-canvas-mid"
+          className="absolute top-2.5 right-2.5 z-10 p-1 rounded-lg bg-white/[0.03] border border-white/[0.05] opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] hover:border-white/[0.15] transition-all"
         >
-          <MoreVertical className="w-3.5 h-3.5 text-body-mid" />
+          <MoreVertical className="w-3.5 h-3.5 text-white/60" />
         </button>
 
-        {/* Thumbnail */}
-        <div className="aspect-square flex items-center justify-center p-4 overflow-hidden">
+        {/* Thumbnail or Icon Container */}
+        <div className="flex-1 relative m-3.5 min-h-0 rounded-xl overflow-hidden bg-black/25 border border-white/[0.03] flex items-center justify-center">
           {file.thumbnailSmall || file.thumbnail ? (
-            <img src={authUrl(`/files/${file.id}/thumbnail?size=small`)} alt={file.originalName} className="w-full h-full object-cover rounded-sm" loading="lazy" />
+            <img
+              src={authUrl(`/files/${file.id}/thumbnail?size=small`)}
+              alt={file.originalName}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
           ) : (
-            <Icon className="w-10 h-10 text-body-mid" />
+            <div className={cn("w-full h-full flex items-center justify-center transition-all duration-300 relative", catColor.iconBg)}>
+              <div className="absolute inset-0 bg-gradient-to-tr from-white/[0.01] to-transparent pointer-events-none" />
+              <Icon className={cn("w-10 h-10 transition-transform duration-300 group-hover:scale-110", catColor.text, catColor.glow)} />
+            </div>
           )}
         </div>
 
         {/* Info */}
-        <div className="px-3 pb-3">
-          <p className="text-sm text-ink truncate mb-1">{file.originalName}</p>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-body-mid font-mono">{formatFileSize(file.size)}</p>
+        <div className="px-4 pb-4 pt-1 shrink-0 bg-black/10 border-t border-white/[0.02]">
+          <p className="text-sm font-semibold text-white/90 group-hover:text-white truncate mb-0.5" title={file.originalName}>{file.originalName}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-white/40 font-mono">{formatFileSize(file.size)}</p>
             {(file as any).refCount > 1 && (
-              <span className="flex items-center gap-0.5 text-xs text-mute" title={`Shared with ${(file as any).refCount - 1} other(s)`}>
+              <span className="flex items-center gap-0.5 text-xs text-cyan-400 glow-cyan" title={`Shared with ${(file as any).refCount - 1} other(s)`}>
                 <Link className="w-3 h-3" />
               </span>
             )}
@@ -251,11 +270,22 @@ export function FileCard({
   }
 
   // List view
+  const getCategoryColor = (cat: string) => {
+    switch (cat?.toLowerCase()) {
+      case "images": return { text: "text-purple-400", glow: "glow-purple" };
+      case "videos": return { text: "text-blue-400", glow: "glow-blue" };
+      case "audio": return { text: "text-pink-400", glow: "glow-magenta" };
+      case "documents": return { text: "text-emerald-400", glow: "glow-cyan" };
+      default: return { text: "text-cyan-400", glow: "glow-cyan" };
+    }
+  };
+  const catColor = getCategoryColor(file.category);
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 px-3 py-2 rounded-sm border transition-all duration-150 cursor-pointer select-none",
-        isSelected ? "border-accent-sunset/50 bg-accent-sunset/5" : "border-transparent hover:bg-canvas-soft/50",
+        "group flex items-center gap-3 px-4 py-2.5 rounded-xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none",
+        isSelected ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.15)]" : "",
       )}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -266,56 +296,56 @@ export function FileCard({
       {/* Checkbox */}
       <div
         className={cn(
-          "w-4 h-4 rounded-sm border-2 flex items-center justify-center shrink-0 transition-all duration-150",
-          isSelected ? "bg-accent-sunset border-accent-sunset" : "border-body-mid/40 opacity-0 group-hover:opacity-100",
+          "w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all duration-150",
+          isSelected ? "bg-cyan-50 border-cyan-400" : "border-white/30 bg-black/40 opacity-0 group-hover:opacity-100",
         )}
       >
         {isSelected && (
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+            <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
       </div>
 
       {/* Thumbnail */}
-      <div className="w-8 h-8 flex items-center justify-center shrink-0 overflow-hidden rounded-sm">
+      <div className="w-8 h-8 flex items-center justify-center shrink-0 overflow-hidden rounded-lg bg-black/20 border border-white/[0.04]">
         {file.thumbnailSmall || file.thumbnail ? (
-          <img src={authUrl(`/files/${file.id}/thumbnail?size=small`)} alt={file.originalName} className="w-full h-full object-cover" loading="lazy" />
+          <img src={authUrl(`/files/${file.id}/thumbnail?size=small`)} alt={file.originalName} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
         ) : (
-          <Icon className="w-5 h-5 text-body-mid" />
+          <Icon className={cn("w-4.5 h-4.5 transition-transform group-hover:scale-110", catColor.text, catColor.glow)} />
         )}
       </div>
 
       {/* Name */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-ink truncate">{file.originalName}</p>
+        <p className="text-sm font-medium text-white/90 group-hover:text-white truncate">{file.originalName}</p>
       </div>
 
       {/* Size */}
-      <p className="text-xs text-body-mid font-mono shrink-0 w-20 text-right">{formatFileSize(file.size)}</p>
+      <p className="text-xs text-white/40 font-mono shrink-0 w-20 text-right">{formatFileSize(file.size)}</p>
 
       {/* Date */}
-      <p className="text-xs text-body-mid shrink-0 w-28 text-right hidden md:block">{formatDate(file.createdAt)}</p>
+      <p className="text-xs text-white/40 font-mono shrink-0 w-28 text-right hidden md:block">{formatDate(file.createdAt)}</p>
 
       {/* Actions */}
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e); }} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors" title="Favorite">
-          <Star className={cn("w-3.5 h-3.5", isFavorite ? "fill-yellow-400 text-yellow-400" : "text-body-mid")} />
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Favorite">
+          <Star className={cn("w-3.5 h-3.5", isFavorite ? "fill-yellow-400 text-yellow-400" : "text-white/60 hover:text-white")} />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors" title="Download">
-          <Download className="w-3.5 h-3.5 text-body-mid" />
+        <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Download">
+          <Download className="w-3.5 h-3.5 text-white/60 hover:text-white" />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors" title="Share">
-          <Share2 className="w-3.5 h-3.5 text-body-mid" />
+        <button onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Share">
+          <Share2 className="w-3.5 h-3.5 text-white/60 hover:text-white" />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); setIsRenameOpen(true); }} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors" title="Rename">
-          <Pencil className="w-3.5 h-3.5 text-body-mid" />
+        <button onClick={(e) => { e.stopPropagation(); setIsRenameOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Rename">
+          <Pencil className="w-3.5 h-3.5 text-white/60 hover:text-white" />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); setIsMoveOpen(true); }} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors" title="Move to">
-          <FolderInput className="w-3.5 h-3.5 text-body-mid" />
+        <button onClick={(e) => { e.stopPropagation(); setIsMoveOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Move to">
+          <FolderInput className="w-3.5 h-3.5 text-white/60 hover:text-white" />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors" title="Move to Trash">
-          <Trash2 className="w-3.5 h-3.5 text-body-mid" />
+        <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-red-500/20 hover:border-red-500/30 transition-all" title="Move to Trash">
+          <Trash2 className="w-3.5 h-3.5 text-white/60 hover:text-red-400" />
         </button>
       </div>
 

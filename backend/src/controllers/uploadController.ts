@@ -86,4 +86,24 @@ export class UploadController {
     const info = await this.uploadService.getResumeInfo(userId, sessionId);
     res.json({ success: true, data: info });
   };
+
+  getSessionUploadedChunks = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    const status = await this.uploadService.getStatus(userId, id);
+    const uploadedIndexes = status.chunks
+      .filter((c) => c.uploaded)
+      .map((c) => c.chunkIndex);
+
+    res.json({
+      success: true,
+      data: {
+        sessionId: status.sessionId,
+        status: status.status,
+        uploadedChunks: uploadedIndexes,
+        totalChunks: status.totalChunks,
+      },
+    });
+  };
 }

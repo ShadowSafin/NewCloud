@@ -30,10 +30,10 @@ interface FolderNode {
 }
 
 const navItems = [
-  { icon: Home, label: "Dashboard", href: "/" },
-  { icon: Clock, label: "Recent", href: "/?view=recent" },
-  { icon: Star, label: "Starred", href: "/?view=starred" },
-  { icon: Trash2, label: "Trash", href: "/?view=trash" },
+  { label: "All files", href: "/" },
+  { label: "Recent", href: "/?view=recent" },
+  { label: "Starred", href: "/?view=starred" },
+  { label: "Trash", href: "/?view=trash" },
 ];
 
 function formatBytes(bytes: number): string {
@@ -64,30 +64,30 @@ function FolderTreeItem({
       <button
         onClick={() => onSelect(node.id)}
         className={cn(
-          "w-full flex items-center gap-1.5 px-2 py-1.5 rounded-sm text-sm transition-colors",
-          isActive ? "bg-accent-sunset/10 text-accent-sunset" : "text-body-mid hover:text-ink hover:bg-canvas-soft/50"
+          "w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors",
+          isActive ? "bg-cyan-500/10 text-cyan-400 font-medium" : "text-white/60 hover:text-white hover:bg-white/[0.02]"
         )}
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
+        style={{ paddingLeft: `${level * 10 + 6}px` }}
       >
         {hasChildren ? (
-          <button
+          <span
             onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-            className="p-0.5 hover:bg-canvas-soft rounded"
+            className="p-0.5 hover:bg-white/[0.05] rounded cursor-pointer"
           >
             {isExpanded ? (
-              <ChevronDown className="w-3 h-3" />
+              <ChevronDown className="w-2.5 h-2.5 text-white/40" />
             ) : (
-              <ChevronRight className="w-3 h-3" />
+              <ChevronRight className="w-2.5 h-2.5 text-white/40" />
             )}
-          </button>
+          </span>
         ) : (
-          <span className="w-4" />
+          <span className="w-3.5" />
         )}
-        <Folder className="w-3.5 h-3.5 shrink-0" />
+        <Folder className="w-3.5 h-3.5 text-cyan-400/80 shrink-0" />
         <span className="truncate">{node.name}</span>
       </button>
       {hasChildren && isExpanded && (
-        <div>
+        <div className="mt-0.5">
           {node.children.map((child) => (
             <FolderTreeItem
               key={child.id}
@@ -109,7 +109,7 @@ export function Sidebar() {
   const router = useRouter();
   const currentView = searchParams.get("view");
   const user = useAuthStore((state) => state.user);
-  const { currentFolderId, setCurrentFolder, folderTree } = useFileStore();
+  const { currentFolderId, setCurrentFolder } = useFileStore();
 
   const [storageUsed, setStorageUsed] = useState(0);
   const [storageTotal, setStorageTotal] = useState(0);
@@ -157,125 +157,111 @@ export function Sidebar() {
   };
 
   const usedPercent = storageTotal > 0 ? Math.min((storageUsed / storageTotal) * 100, 100) : 0;
-  const barColor = "#ff7a17";
 
   return (
-    <aside className="w-64 h-full border-r border-hairline bg-canvas flex flex-col shrink-0">
-      {/* Logo */}
-      <div className="p-4 pb-3 border-b border-hairline">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-sm border border-hairline flex items-center justify-center bg-canvas-soft">
-            <HardDrive className="w-4 h-4 text-ink" />
-          </div>
-          <span className="text-base font-medium text-ink">CloudStore</span>
-        </Link>
-      </div>
-
+    <aside className="w-56 h-full border-r border-white/[0.06] bg-black/15 flex flex-col shrink-0">
       {/* Quick Access */}
-      <div className="p-3 pb-1">
-        <div className="eyebrow-mono-sm text-body-mid mb-2">Quick access</div>
-        <div className="space-y-0.5">
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              onClick={() => handleNavClick(item.href)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-sm text-sm transition-colors",
-                isActive(item.href)
-                  ? "bg-canvas-soft text-ink font-medium"
-                  : "text-body-mid hover:text-ink hover:bg-canvas-soft/50"
-              )}
-            >
-              <item.icon className="w-4 h-4 shrink-0" />
-              {item.label}
-            </button>
-          ))}
+      <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
+        <div className="space-y-1">
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <button
+                key={item.label}
+                onClick={() => handleNavClick(item.href)}
+                className={cn(
+                  "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                  active
+                    ? "bg-white/[0.04] text-white font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                    : "text-white/60 hover:text-white hover:bg-white/[0.02]"
+                )}
+              >
+                {/* Cyan active dot on left */}
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full mr-2.5 transition-all duration-300",
+                  active ? "bg-cyan-400 glow-cyan scale-100" : "bg-transparent scale-0"
+                )} />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
-      </div>
 
-      {/* Folder Tree */}
-      <div className="flex-1 px-3 py-2 overflow-y-auto border-t border-hairline mt-2">
-        <div className="flex items-center justify-between mb-2">
-          <div className="eyebrow-mono-sm text-body-mid">Folders</div>
-        </div>
-        {localTree.length > 0 ? (
-          <div className="space-y-0.5">
-            <button
-              onClick={() => { setCurrentFolder(null); router.push("/"); }}
-              className={cn(
-                "w-full flex items-center gap-1.5 px-2 py-1.5 rounded-sm text-sm transition-colors",
-                currentFolderId === null 
-                  ? "bg-accent-sunset/10 text-accent-sunset" 
-                  : "text-body-mid hover:text-ink hover:bg-canvas-soft/50"
-              )}
-            >
-              <Folder className="w-3.5 h-3.5" />
-              <span>All Files</span>
-            </button>
-            {localTree.map((node) => (
-              <FolderTreeItem
-                key={node.id}
-                node={node}
-                level={0}
-                currentFolderId={currentFolderId}
-                onSelect={handleFolderSelect}
-              />
-            ))}
+        {/* Folder Tree */}
+        <div className="border-t border-white/[0.06] pt-4 mt-4">
+          <div className="text-[10px] uppercase font-bold tracking-wider text-white/35 mb-2 px-2">
+            Folders
           </div>
-        ) : (
-          <p className="text-xs text-body-mid px-2 py-1">No folders yet</p>
-        )}
-      </div>
-
-      {/* Storage indicator */}
-      <div className="p-4 mx-3 mb-3 rounded-sm bg-canvas-soft border border-hairline">
-        <div className="flex items-center gap-2 mb-2">
-          <HardDrive className="w-3.5 h-3.5 text-body-mid" />
-          <span className="eyebrow-mono-sm">Storage</span>
-        </div>
-
-        <div className="h-1.5 bg-canvas-mid rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${usedPercent}%`,
-              background: barColor,
-            }}
-          />
-        </div>
-        <div className="flex items-center justify-between mt-1.5">
-          <p className="text-xs text-body-mid">
-            {formatBytes(storageUsed)} of {formatBytes(storageTotal)}
-          </p>
-          <p className="text-xs text-body-mid">{fileCount} files</p>
-        </div>
-        {trashSize > 0 && (
-          <p className="text-xs text-mute mt-1">
-            Trash: {formatBytes(trashSize)}
-          </p>
-        )}
-      </div>
-
-      {/* User & Settings */}
-      <div className="p-3 border-t border-hairline">
-        <button
-          onClick={() => router.push("/settings")}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-sm text-sm transition-colors",
-            pathname === "/settings"
-              ? "bg-canvas-soft text-ink"
-              : "text-body-mid hover:text-ink hover:bg-canvas-soft/50"
+          {localTree.length > 0 ? (
+            <div className="space-y-0.5">
+              <button
+                onClick={() => { setCurrentFolder(null); router.push("/"); }}
+                className={cn(
+                  "w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors",
+                  currentFolderId === null 
+                    ? "bg-white/[0.04] text-white font-medium" 
+                    : "text-white/60 hover:text-white hover:bg-white/[0.02]"
+                )}
+              >
+                <Folder className="w-3.5 h-3.5 text-cyan-400/80" />
+                <span>All Files</span>
+              </button>
+              {localTree.map((node) => (
+                <FolderTreeItem
+                  key={node.id}
+                  node={node}
+                  level={0}
+                  currentFolderId={currentFolderId}
+                  onSelect={handleFolderSelect}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] text-white/40 px-2 py-1 italic">No subfolders</p>
           )}
-        >
-          <Settings className="w-4 h-4" />
-          Settings
-        </button>
-        <div className="flex items-center gap-3 mt-3 px-3">
-          <div className="w-7 h-7 rounded-full bg-canvas-mid flex items-center justify-center text-xs text-body font-medium">
-            {user?.username?.[0]?.toUpperCase() || "U"}
+        </div>
+      </div>
+
+      {/* Bottom Section: Storage */}
+      <div className="p-4 border-t border-white/[0.06] space-y-3">
+        <div className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-3 backdrop-blur-md shadow-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-white/35">Storage</span>
+            <span className="text-[10px] font-semibold text-white/70">
+              {formatBytes(storageUsed)} / {formatBytes(storageTotal)}
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-ink truncate">{user?.username || "User"}</p>
+
+          <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 glow-cyan transition-all duration-500"
+              style={{ width: `${usedPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* User profile & Settings */}
+        <div className="flex flex-col gap-1.5">
+          <button
+            onClick={() => router.push("/settings")}
+            className={cn(
+              "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs transition-all duration-200",
+              pathname === "/settings"
+                ? "bg-white/[0.04] text-white font-medium"
+                : "text-white/50 hover:text-white hover:bg-white/[0.02]"
+            )}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            Settings
+          </button>
+          
+          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-white/[0.01]">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-[10px] text-white font-semibold">
+              {user?.username?.[0]?.toUpperCase() || "U"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-white/80 font-medium truncate">{user?.username || "User"}</p>
+            </div>
           </div>
         </div>
       </div>

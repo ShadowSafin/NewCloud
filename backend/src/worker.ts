@@ -1,3 +1,4 @@
+import "./lib/bigintPatch";
 import { startAllWorkers, stopAllWorkers } from "./workers";
 
 console.log("Starting CloudStore worker process...");

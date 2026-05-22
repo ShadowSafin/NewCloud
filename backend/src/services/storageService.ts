@@ -33,6 +33,18 @@ export class StorageService {
     return path.join(this.rootPath, userId);
   }
 
+  isSafePath(userId: string, targetPath: string): boolean {
+    const userPath = path.resolve(this.getUserPath(userId));
+    const resolvedPath = path.resolve(targetPath);
+    return resolvedPath === userPath || resolvedPath.startsWith(userPath + path.sep);
+  }
+
+  isSafePathGlobal(targetPath: string): boolean {
+    const globalPath = path.resolve(this.rootPath);
+    const resolvedPath = path.resolve(targetPath);
+    return resolvedPath === globalPath || resolvedPath.startsWith(globalPath + path.sep);
+  }
+
   getUserFilesPath(userId: string): string {
     return path.join(this.rootPath, userId, "files");
   }

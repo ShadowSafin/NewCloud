@@ -1,595 +1,335 @@
-import { PrismaClient } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import fs from "fs";
+import { PrismaClient, File } from "@prisma/client";
+import { FileRepository } from "../repositories/FileRepository";
+import { UserRepository } from "../repositories/UserRepository";
+import { VersionService } from "./versionService";
 import { storageService } from "./storageService";
 import { fileTypeService } from "./fileTypeService";
-import { DedupService } from "./dedupService";
-import { thumbnailQueue } from "../lib/queues";
-import { cacheInvalidate } from "../lib/redis";
-import { NotFoundError, ForbiddenError, ConflictError } from "../utils/errors";
-import { FileMetadata } from "../types";
+import { dedupService } from "./dedupService";
+import { thumbnailService } from "./thumbnailService";
+import { NotFoundError, ForbiddenError, BadRequestError } from "../utils/errors";
 
 export class FileService {
-  private dedupService: DedupService;
+  private fileRepository: FileRepository;
+  private userRepository: UserRepository;
+  private versionService: VersionService;
 
   constructor(private prisma: PrismaClient) {
-    this.dedupService = new DedupService(prisma);
+    this.fileRepository = new FileRepository(prisma);
+    this.userRepository = new UserRepository(prisma);
+    this.versionService = new VersionService(prisma);
   }
 
-  async create(
-    userId: string,
-    file: Express.Multer.File,
-    folderId?: string
-  ): Promise<FileMetadata> {
+  async create(userId: string, file: Express.Multer.File, folderId?: string): Promise<File> {
     await storageService.ensureUserDirectories(userId);
 
-    if (folderId) {
-      const folder = await this.prisma.folder.findUnique({
-        where: { id: folderId },
-      });
-
-      if (!folder) {
-        throw new NotFoundError("Folder not found");
-      }
-
-      if (folder.userId !== userId) {
-        throw new ForbiddenError("Access denied");
-      }
-    }
-
-    let originalName = file.originalname;
-    const existingFile = await this.prisma.file.findFirst({
-      where: {
-        userId,
-        folderId: folderId || null,
-        originalName,
-      },
-    });
-
-    if (existingFile) {
-      const ext = path.extname(originalName);
-      const nameWithoutExt = path.basename(originalName, ext);
-      const timestamp = Date.now();
-      originalName = `${nameWithoutExt} (${timestamp})${ext}`;
-    }
-
-    const storedPath = storageService.getFilePath(userId, file.filename);
+    const ext = path.extname(file.originalname).toLowerCase();
     const fileInfo = fileTypeService.getFileInfo(file.originalname, file.mimetype);
+    const category = fileInfo.category;
+    const mimeType = fileInfo.mimeType;
 
-    // Compute SHA-256 hash for deduplication
-    const hash = await this.dedupService.computeHash(storedPath);
+    const storedName = `${uuidv4()}${ext}`;
+    const targetPath = storageService.getFilePath(userId, storedName);
 
-    // Check for deduplication
-    const dedupResult = await this.dedupService.deduplicate(
+    // Move file from multer temp path to files path
+    if (fs.existsSync(file.path)) {
+      fs.renameSync(file.path, targetPath);
+    } else {
+      throw new BadRequestError("Temporary upload file not found");
+    }
+
+    // Dynamic Binary Signature Validation (Magic-Number validation)
+    const isSignatureValid = await fileTypeService.validateSignature(targetPath, file.mimetype || mimeType);
+    if (!isSignatureValid) {
+      try {
+        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+      } catch {}
+      throw new BadRequestError("File signature mismatch: the file contents do not match the expected type or extension");
+    }
+
+    // Compute SHA-256 hash & deduplicate
+    const hash = await dedupService.computeHash(targetPath);
+    const dedup = await dedupService.deduplicate(userId, targetPath, storedName, hash);
+
+    // Check for duplicate filename in the same folder
+    const existingFile = await this.fileRepository.findByNameAndFolder(
       userId,
-      storedPath,
-      file.filename,
-      hash
+      file.originalname,
+      folderId || null
     );
 
-    const createdFile = await this.prisma.file.create({
-      data: {
-        userId,
-        folderId: folderId || null,
-        originalName,
-        storedName: dedupResult.storedName,
-        path: dedupResult.path,
-        mimeType: file.mimetype,
-        category: fileInfo.category,
-        size: file.size,
+    if (existingFile) {
+      // 1. Create a version backup of the existing file
+      await this.versionService.createVersion(userId, existingFile.id);
+
+      // 2. Safely release/delete the previous physical file
+      await dedupService.releaseFile(existingFile);
+
+      // 3. Update the existing file record with the new properties
+      const updatedFile = await this.fileRepository.update(existingFile.id, {
+        storedName: dedup.storedName,
+        path: dedup.path,
+        mimeType,
+        extension: ext,
+        category,
+        size: BigInt(file.size),
         hash,
-      },
+        refCount: dedup.deduplicated ? undefined : 1,
+        thumbnail: null,
+        thumbnailSmall: null,
+        thumbnailMedium: null,
+        thumbnailLarge: null,
+      });
+
+      // Update storage used net change
+      await this.userRepository.updateStorageUsed(userId, BigInt(file.size) - BigInt(existingFile.size));
+      await storageService.invalidateCache(userId);
+
+      // Generate thumbnails asynchronously if not deduplicated
+      if (!dedup.deduplicated && fileTypeService.canThumbnail(mimeType, ext)) {
+        thumbnailService.processUploadedFile(updatedFile.id).catch((err) => {
+          console.error(`[Thumbnail] Async thumbnail generation failed for ${updatedFile.id}:`, err);
+        });
+      }
+
+      return updatedFile;
+    }
+
+    // No duplicate filename exists - create new file record
+    const createdFile = await this.fileRepository.create({
+      userId,
+      folderId: folderId || null,
+      originalName: file.originalname,
+      storedName: dedup.storedName,
+      path: dedup.path,
+      mimeType,
+      extension: ext,
+      category,
+      size: BigInt(file.size),
+      hash,
+      refCount: dedup.deduplicated ? undefined : 1,
     });
 
-    // Update user storage used
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { storageUsed: { increment: file.size } },
-    });
+    // Update storage used
+    await this.userRepository.updateStorageUsed(userId, BigInt(file.size));
+    await storageService.invalidateCache(userId);
 
-    // Enqueue thumbnail generation
-    if (fileInfo.canThumbnail) {
-      await thumbnailQueue.add("generate", { fileId: createdFile.id }).catch((err) => {
-        console.error("Failed to enqueue thumbnail job:", err.message);
+    // Generate thumbnails asynchronously if not deduplicated
+    if (!dedup.deduplicated && fileTypeService.canThumbnail(mimeType, ext)) {
+      thumbnailService.processUploadedFile(createdFile.id).catch((err) => {
+        console.error(`[Thumbnail] Async thumbnail generation failed for ${createdFile.id}:`, err);
       });
     }
 
-    // Invalidate caches
-    await cacheInvalidate(`storage:${userId}`);
-    await cacheInvalidate(`files:${userId}:*`);
-
-    return this.mapToFileMetadata(createdFile);
+    return createdFile;
   }
 
   async findAll(
     userId: string,
     folderId?: string,
     search?: string,
-    filters?: { category?: string; minSize?: number; maxSize?: number }
-  ): Promise<FileMetadata[]> {
-    const where: Record<string, unknown> = { userId, deletedAt: null };
-
-    if (folderId) {
-      where.folderId = folderId;
-    } else if (folderId === undefined) {
-      where.folderId = null;
-    }
-
-    if (search) {
-      where.originalName = {
-        contains: search,
-        mode: "insensitive",
-      };
-    }
-
-    if (filters?.category) {
-      where.category = filters.category;
-    }
-
-    if (filters?.minSize || filters?.maxSize) {
-      const sizeFilter: Record<string, number> = {};
-      if (filters.minSize) sizeFilter.gte = filters.minSize;
-      if (filters.maxSize) sizeFilter.lte = filters.maxSize;
-      where.size = sizeFilter;
-    }
-
-    const files = await this.prisma.file.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
+    filters?: { category?: string; minSize?: number; maxSize?: number; limit?: number; offset?: number }
+  ): Promise<{ files: File[]; totalCount: number }> {
+    const { files, totalCount } = await this.fileRepository.findAll({
+      userId,
+      folderId: folderId === "root" ? null : folderId,
+      search,
+      category: filters?.category,
+      minSize: filters?.minSize,
+      maxSize: filters?.maxSize,
+      deletedAt: null,
+      limit: filters?.limit,
+      offset: filters?.offset,
     });
-
-    return files.map(this.mapToFileMetadata);
+    return { files, totalCount };
   }
 
-  async findById(userId: string, id: string): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({
-      where: { id },
-    });
-
+  async findById(userId: string, id: string): Promise<File> {
+    const file = await this.fileRepository.findById(id);
     if (!file) {
       throw new NotFoundError("File not found");
     }
-
     if (file.userId !== userId) {
       throw new ForbiddenError("Access denied");
     }
-
-    return this.mapToFileMetadata(file);
-  }
-
-  async update(
-    userId: string,
-    id: string,
-    originalName: string
-  ): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({
-      where: { id },
-    });
-
-    if (!file) {
-      throw new NotFoundError("File not found");
-    }
-
-    if (file.userId !== userId) {
-      throw new ForbiddenError("Access denied");
-    }
-
-    // Check for duplicate name in same folder
-    const duplicate = await this.prisma.file.findFirst({
-      where: {
-        userId,
-        folderId: file.folderId,
-        originalName,
-        NOT: { id },
-      },
-    });
-
-    if (duplicate) {
-      throw new ConflictError("A file with this name already exists in this folder");
-    }
-
-    const updated = await this.prisma.file.update({
-      where: { id },
-      data: { originalName },
-    });
-
-    return this.mapToFileMetadata(updated);
-  }
-
-  async delete(userId: string, id: string): Promise<void> {
-    const file = await this.prisma.file.findUnique({ where: { id } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
-
-    // Release physical file (handles refCount)
-    await this.dedupService.releaseFile(file);
-
-    await this.prisma.file.delete({ where: { id } });
+    return file;
   }
 
   async getFilePath(userId: string, id: string): Promise<string> {
-    const file = await this.prisma.file.findUnique({ where: { id } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
-
+    const file = await this.findById(userId, id);
     return file.path;
   }
 
-  async getRecentFiles(userId: string, limit: number = 10): Promise<FileMetadata[]> {
-    const files = await this.prisma.file.findMany({
-      where: { userId, deletedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
-
-    return files.map(this.mapToFileMetadata);
+  async update(userId: string, id: string, originalName: string): Promise<File> {
+    const file = await this.findById(userId, id);
+    return this.fileRepository.update(id, { originalName });
   }
 
-  async getStorageUsage(userId: string): Promise<{ used: number; fileCount: number }> {
-    return await storageService.getStorageStats(userId);
+  async delete(userId: string, id: string): Promise<void> {
+    await this.trash(userId, id);
   }
 
-  async getFavorites(userId: string): Promise<FileMetadata[]> {
-    const files = await this.prisma.file.findMany({
-      where: { userId, isFavorite: true, deletedAt: null },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return files.map(this.mapToFileMetadata);
+  async getRecentFiles(userId: string, limit: number): Promise<File[]> {
+    return this.fileRepository.getRecent(userId, limit);
   }
 
-  async toggleFavorite(userId: string, id: string): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({ where: { id } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
-
-    const updated = await this.prisma.file.update({
-      where: { id },
-      data: { isFavorite: !file.isFavorite },
-    });
-
-    return this.mapToFileMetadata(updated);
+  async getFavorites(userId: string): Promise<File[]> {
+    return this.fileRepository.getFavorites(userId);
   }
 
-  async move(userId: string, fileId: string, targetFolderId: string | null): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
+  async toggleFavorite(userId: string, id: string): Promise<File> {
+    const file = await this.findById(userId, id);
+    return this.fileRepository.update(id, { isFavorite: !file.isFavorite });
+  }
 
-    if (targetFolderId) {
-      const folder = await this.prisma.folder.findUnique({
-        where: { id: targetFolderId },
-      });
-      if (!folder) throw new NotFoundError("Target folder not found");
-      if (folder.userId !== userId) throw new ForbiddenError("Access denied");
+  async move(userId: string, id: string, folderId: string | null): Promise<File> {
+    await this.findById(userId, id);
+    return this.fileRepository.update(id, { folderId });
+  }
+
+  async trash(userId: string, id: string): Promise<File> {
+    const file = await this.findById(userId, id);
+    if (file.deletedAt) {
+      return file; // Already trashed
     }
 
-    // Check for duplicate name in target folder
-    const existing = await this.prisma.file.findFirst({
-      where: {
-        userId,
-        folderId: targetFolderId,
-        originalName: file.originalName,
-        id: { not: fileId },
-      },
-    });
+    const updated = await this.fileRepository.update(id, { deletedAt: new Date() });
 
-    let newName = file.originalName;
-    if (existing) {
-      const ext = path.extname(file.originalName);
-      const nameWithoutExt = path.basename(file.originalName, ext);
-      newName = `${nameWithoutExt} (${Date.now()})${ext}`;
+    // Decrement storageUsed and increment trashSize
+    await this.userRepository.updateStorageUsed(userId, -BigInt(file.size));
+    await this.userRepository.updateTrashSize(userId, BigInt(file.size));
+    await storageService.invalidateCache(userId);
+
+    return updated;
+  }
+
+  async restore(userId: string, id: string): Promise<File> {
+    const file = await this.findById(userId, id);
+    if (!file.deletedAt) {
+      return file; // Not in trash
     }
 
-    const updated = await this.prisma.file.update({
-      where: { id: fileId },
-      data: {
-        folderId: targetFolderId,
-        originalName: newName,
-      },
-    });
+    const updated = await this.fileRepository.update(id, { deletedAt: null });
 
-    return this.mapToFileMetadata(updated);
+    // Increment storageUsed and decrement trashSize
+    await this.userRepository.updateStorageUsed(userId, BigInt(file.size));
+    await this.userRepository.updateTrashSize(userId, -BigInt(file.size));
+    await storageService.invalidateCache(userId);
+
+    return updated;
   }
 
-  async copy(userId: string, fileId: string, targetFolderId: string | null): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
+  async permanentDelete(userId: string, id: string): Promise<void> {
+    const file = await this.findById(userId, id);
 
-    if (targetFolderId) {
-      const folder = await this.prisma.folder.findUnique({
-        where: { id: targetFolderId },
-      });
-      if (!folder) throw new NotFoundError("Target folder not found");
-      if (folder.userId !== userId) throw new ForbiddenError("Access denied");
+    // Release file reference (dedup check & physical file delete if last ref)
+    await dedupService.releaseFile(file);
+
+    // Delete record from DB
+    await this.fileRepository.delete(id);
+
+    // Update user stats
+    if (file.deletedAt) {
+      await this.userRepository.updateTrashSize(userId, -BigInt(file.size));
+    } else {
+      await this.userRepository.updateStorageUsed(userId, -BigInt(file.size));
     }
-
-    // Generate copy name and new stored name
-    const copyName = await this.generateCopyName(userId, targetFolderId, file.originalName);
-    const { v4: uuidv4 } = require("uuid");
-    const newStoredName = `${uuidv4()}${path.extname(file.originalName)}`;
-
-    // Copy the physical file
-    const sourcePath = file.path;
-    const targetPath = storageService.getFilePath(userId, newStoredName);
-    
-    try {
-      const fs = require("fs");
-      fs.copyFileSync(sourcePath, targetPath);
-    } catch (err) {
-      console.error("Failed to copy file:", err);
-      throw new Error("Failed to copy file");
-    }
-
-    // Create new file record
-    const newFile = await this.prisma.file.create({
-      data: {
-        userId,
-        folderId: targetFolderId,
-        originalName: copyName,
-        storedName: newStoredName,
-        path: targetPath,
-        mimeType: file.mimeType,
-        category: file.category,
-        size: file.size,
-        hash: file.hash,
-        refCount: 1,
-      },
-    });
-
-    // Update user storage
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { storageUsed: { increment: Number(file.size) } },
-    });
-
-    // Enqueue thumbnail for copy
-    const fileInfo = fileTypeService.getFileInfo(file.originalName, file.mimeType);
-    if (fileInfo.canThumbnail) {
-      await thumbnailQueue.add("generate", { fileId: newFile.id }).catch(() => {});
-    }
-
-    return this.mapToFileMetadata(newFile);
+    await storageService.invalidateCache(userId);
   }
 
-  private async generateCopyName(
-    userId: string,
-    folderId: string | null,
-    originalName: string
-  ): Promise<string> {
-    const ext = path.extname(originalName);
-    const nameWithoutExt = path.basename(originalName, ext);
-    let copyName = `${nameWithoutExt} (copy)${ext}`;
-
-    let counter = 1;
-    while (true) {
-      const existing = await this.prisma.file.findFirst({
-        where: { userId, folderId, originalName: copyName },
-      });
-      if (!existing) break;
-      counter++;
-      copyName = `${nameWithoutExt} (copy ${counter})${ext}`;
-    }
-
-    return copyName;
-  }
-
-  async trash(userId: string, fileId: string): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
-
-    const updated = await this.prisma.file.update({
-      where: { id: fileId },
-      data: { deletedAt: new Date() },
-    });
-
-    // Track trash size
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { trashSize: { increment: Number(file.size) } },
-    });
-
-    return this.mapToFileMetadata(updated);
-  }
-
-  async restore(userId: string, fileId: string): Promise<FileMetadata> {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
-
-    const updated = await this.prisma.file.update({
-      where: { id: fileId },
-      data: { deletedAt: null },
-    });
-
-    // Update trash size
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { trashSize: { decrement: Number(file.size) } },
-    });
-
-    return this.mapToFileMetadata(updated);
-  }
-
-  async permanentDelete(userId: string, fileId: string): Promise<void> {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
-    if (!file) throw new NotFoundError("File not found");
-    if (file.userId !== userId) throw new ForbiddenError("Access denied");
-
-    // Release physical file (handles refCount)
-    await this.dedupService.releaseFile(file);
-
-    // Update storage used
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        storageUsed: { decrement: Number(file.size) },
-        trashSize: file.deletedAt ? { decrement: Number(file.size) } : undefined,
-      },
-    });
-
-    await this.prisma.file.delete({ where: { id: fileId } });
-  }
-
-  async listTrash(userId: string): Promise<FileMetadata[]> {
-    const files = await this.prisma.file.findMany({
-      where: { userId, deletedAt: { not: null } },
-      orderBy: { deletedAt: "desc" },
-    });
-    return files.map(this.mapToFileMetadata);
+  async listTrash(userId: string): Promise<File[]> {
+    return this.fileRepository.getTrash(userId);
   }
 
   async emptyTrash(userId: string): Promise<void> {
-    const files = await this.prisma.file.findMany({
-      where: { userId, deletedAt: { not: null } },
-    });
-
-    let totalSize = 0;
-
-    for (const file of files) {
-      // Release physical file (handles refCount)
-      await this.dedupService.releaseFile(file);
-      totalSize += Number(file.size);
+    const trashedFiles = await this.listTrash(userId);
+    for (const file of trashedFiles) {
+      await dedupService.releaseFile(file);
+      await this.fileRepository.delete(file.id);
     }
 
-    await this.prisma.file.deleteMany({
-      where: { userId, deletedAt: { not: null } },
-    });
-
-    await this.prisma.folder.deleteMany({
-      where: { userId, deletedAt: { not: null } },
-    });
-
-    // Update storage used and trash size
-    if (totalSize > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          storageUsed: { decrement: totalSize },
-          trashSize: 0,
-        },
-      });
+    // Set trash size to 0
+    const user = await this.userRepository.findById(userId);
+    if (user) {
+      await this.userRepository.update(userId, { trashSize: 0 });
     }
+    await storageService.invalidateCache(userId);
   }
 
-  async bulkTrash(userId: string, fileIds: string[]): Promise<number> {
-    const files = await this.prisma.file.findMany({
-      where: { id: { in: fileIds }, userId },
+  async copy(userId: string, id: string, folderId: string | null): Promise<File> {
+    const file = await this.findById(userId, id);
+    const newStoredName = `${uuidv4()}${file.extension}`;
+
+    // Increment refCount on ALL files sharing this physical path
+    const newRefCount = file.refCount + 1;
+    await this.prisma.file.updateMany({
+      where: { path: file.path },
+      data: { refCount: newRefCount },
     });
 
-    if (files.length !== fileIds.length) {
-      throw new NotFoundError("Some files not found");
-    }
-
-    let totalSize = 0;
-    for (const file of files) {
-      await this.prisma.file.update({
-        where: { id: file.id },
-        data: { deletedAt: new Date() },
-      });
-      totalSize += Number(file.size);
-    }
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { trashSize: { increment: totalSize } },
-    });
-
-    return files.length;
-  }
-
-  async bulkRestore(userId: string, fileIds: string[]): Promise<number> {
-    const files = await this.prisma.file.findMany({
-      where: { id: { in: fileIds }, userId, deletedAt: { not: null } },
-    });
-
-    let totalSize = 0;
-    for (const file of files) {
-      await this.prisma.file.update({
-        where: { id: file.id },
-        data: { deletedAt: null },
-      });
-      totalSize += Number(file.size);
-    }
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { trashSize: { decrement: totalSize } },
-    });
-
-    return files.length;
-  }
-
-  async bulkMove(userId: string, fileIds: string[], targetFolderId: string | null): Promise<number> {
-    const files = await this.prisma.file.findMany({
-      where: { id: { in: fileIds }, userId },
-    });
-
-    if (files.length !== fileIds.length) {
-      throw new NotFoundError("Some files not found");
-    }
-
-    for (const file of files) {
-      const existing = await this.prisma.file.findFirst({
-        where: {
-          userId,
-          folderId: targetFolderId,
-          originalName: file.originalName,
-          id: { not: file.id },
-        },
-      });
-
-      let newName = file.originalName;
-      if (existing) {
-        const ext = path.extname(file.originalName);
-        const nameWithoutExt = path.basename(file.originalName, ext);
-        newName = `${nameWithoutExt} (${Date.now()})${ext}`;
-      }
-
-      await this.prisma.file.update({
-        where: { id: file.id },
-        data: { folderId: targetFolderId, originalName: newName },
-      });
-    }
-
-    return files.length;
-  }
-
-  async bulkCopy(userId: string, fileIds: string[], targetFolderId: string | null): Promise<number> {
-    const files = await this.prisma.file.findMany({
-      where: { id: { in: fileIds }, userId },
-    });
-
-    if (files.length !== fileIds.length) {
-      throw new NotFoundError("Some files not found");
-    }
-
-    for (const file of files) {
-      await this.copy(userId, file.id, targetFolderId);
-    }
-
-    return files.length;
-  }
-
-  private mapToFileMetadata(file: any): FileMetadata {
-    return {
-      id: file.id,
-      originalName: file.originalName,
-      storedName: file.storedName,
+    const copiedFile = await this.fileRepository.create({
+      userId,
+      folderId,
+      originalName: `Copy of ${file.originalName}`,
+      storedName: newStoredName,
       path: file.path,
       mimeType: file.mimeType,
-      category: file.category || "unknown",
-      thumbnail: file.thumbnail || null,
-      thumbnailSmall: file.thumbnailSmall || null,
-      thumbnailMedium: file.thumbnailMedium || null,
-      thumbnailLarge: file.thumbnailLarge || null,
-      isFavorite: file.isFavorite || false,
-      size: Number(file.size),
-      createdAt: file.createdAt,
-      userId: file.userId,
-      folderId: file.folderId,
-    };
+      extension: file.extension,
+      category: file.category,
+      size: file.size,
+      hash: file.hash,
+      refCount: newRefCount,
+    });
+
+    await this.userRepository.updateStorageUsed(userId, file.size);
+    await storageService.invalidateCache(userId);
+
+    return copiedFile;
+  }
+
+  async bulkTrash(userId: string, ids: string[]): Promise<number> {
+    let processed = 0;
+    for (const id of ids) {
+      try {
+        await this.trash(userId, id);
+        processed++;
+      } catch {}
+    }
+    return processed;
+  }
+
+  async bulkRestore(userId: string, ids: string[]): Promise<number> {
+    let processed = 0;
+    for (const id of ids) {
+      try {
+        await this.restore(userId, id);
+        processed++;
+      } catch {}
+    }
+    return processed;
+  }
+
+  async bulkMove(userId: string, ids: string[], folderId: string | null): Promise<number> {
+    let processed = 0;
+    for (const id of ids) {
+      try {
+        await this.move(userId, id, folderId);
+        processed++;
+      } catch {}
+    }
+    return processed;
+  }
+
+  async bulkCopy(userId: string, ids: string[], folderId: string | null): Promise<number> {
+    let processed = 0;
+    for (const id of ids) {
+      try {
+        await this.copy(userId, id, folderId);
+        processed++;
+      } catch {}
+    }
+    return processed;
   }
 }

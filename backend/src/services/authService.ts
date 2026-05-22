@@ -1,168 +1,171 @@
 import bcrypt from "bcryptjs";
-import jwt, { SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { UserRepository } from "../repositories/UserRepository";
 import { config } from "../config";
-import { AuthTokens, TokenPayload } from "../types";
-import { RegisterInput, LoginInput } from "../utils/validators";
-import { UnauthorizedError, ConflictError, BadRequestError } from "../utils/errors";
+import { TokenPayload } from "../types";
+import { BadRequestError, UnauthorizedError } from "../utils/errors";
+import { LoginInput, RegisterInput } from "../utils/validators";
 
 export class AuthService {
-  constructor(private prisma: PrismaClient) {}
+  private userRepository: UserRepository;
 
-  async register(data: RegisterInput): Promise<AuthTokens> {
-    const existingUser = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ email: data.email }, { username: data.username }],
-      },
+  constructor(private prisma: PrismaClient) {
+    this.userRepository = new UserRepository(prisma);
+  }
+
+  private generateTokens(user: { id: string; username: string; email: string }) {
+    const payload: TokenPayload = {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+    };
+
+    const accessToken = jwt.sign(payload, config.jwtSecret, {
+      expiresIn: config.jwtExpiration as any,
     });
 
-    if (existingUser) {
-      throw new ConflictError(
-        existingUser.email === data.email
-          ? "Email already registered"
-          : "Username already taken"
-      );
+    const refreshToken = jwt.sign(payload, config.jwtRefreshSecret, {
+      expiresIn: config.jwtRefreshExpiration as any,
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  async register(data: RegisterInput) {
+    const existingEmail = await this.userRepository.findByEmail(data.email);
+    if (existingEmail) {
+      throw new BadRequestError("Email is already registered");
+    }
+
+    const existingUsername = await this.userRepository.findByUsername(data.username);
+    if (existingUsername) {
+      throw new BadRequestError("Username is already taken");
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
 
-    const user = await this.prisma.user.create({
+    const user = await this.userRepository.create({
+      username: data.username,
+      email: data.email,
+      passwordHash,
+      storageQuota: config.defaultStorageQuota,
+    });
+
+    const tokens = this.generateTokens(user);
+
+    // Save refresh token
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+    await this.prisma.refreshToken.create({
       data: {
-        username: data.username,
-        email: data.email,
-        passwordHash,
+        token: tokens.refreshToken,
+        userId: user.id,
+        expiresAt,
       },
     });
 
-    return this.generateTokens(user.id, user.username, user.email);
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    };
   }
 
-  async login(data: LoginInput): Promise<AuthTokens> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: data.email },
-    });
-
+  async login(data: LoginInput) {
+    const user = await this.userRepository.findByEmail(data.email);
     if (!user) {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    const isValid = await bcrypt.compare(data.password, user.passwordHash);
-
-    if (!isValid) {
+    const valid = await bcrypt.compare(data.password, user.passwordHash);
+    if (!valid) {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    return this.generateTokens(user.id, user.username, user.email);
+    const tokens = this.generateTokens(user);
+
+    // Save refresh token
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: tokens.refreshToken,
+        userId: user.id,
+        expiresAt,
+      },
+    });
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    };
   }
 
-  async refreshToken(token: string): Promise<AuthTokens> {
-    const refreshToken = await this.prisma.refreshToken.findUnique({
+  async refreshToken(token: string) {
+    const record = await this.prisma.refreshToken.findUnique({
       where: { token },
       include: { user: true },
     });
 
-    if (!refreshToken) {
-      throw new UnauthorizedError("Invalid refresh token");
+    if (!record || record.expiresAt < new Date()) {
+      throw new UnauthorizedError("Invalid or expired refresh token");
     }
 
-    if (refreshToken.expiresAt < new Date()) {
-      await this.prisma.refreshToken.delete({ where: { id: refreshToken.id } });
-      throw new UnauthorizedError("Refresh token expired");
-    }
+    const tokens = this.generateTokens(record.user);
 
-    // Delete old refresh token and issue new ones
-    await this.prisma.refreshToken.delete({ where: { id: refreshToken.id } });
+    // Rotate refresh token: delete old, save new
+    await this.prisma.refreshToken.delete({ where: { id: record.id } });
 
-    return this.generateTokens(
-      refreshToken.user.id,
-      refreshToken.user.username,
-      refreshToken.user.email
-    );
-  }
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
-  async logout(userId: string, token: string): Promise<void> {
-    await this.prisma.refreshToken.deleteMany({
-      where: {
-        userId,
-        token,
+    await this.prisma.refreshToken.create({
+      data: {
+        token: tokens.refreshToken,
+        userId: record.userId,
+        expiresAt,
       },
     });
+
+    return tokens;
   }
 
-  async logoutAll(userId: string): Promise<void> {
+  async logout(userId: string, token: string) {
     await this.prisma.refreshToken.deleteMany({
-      where: { userId },
+      where: {
+        token,
+        userId,
+      },
     });
   }
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        avatar: true,
-        createdAt: true,
-      },
-    });
-
+    const user = await this.userRepository.findById(userId);
     if (!user) {
       throw new UnauthorizedError("User not found");
     }
 
-    return user;
-  }
-
-  private async generateTokens(
-    userId: string,
-    username: string,
-    email: string
-  ): Promise<AuthTokens> {
-    const payload: TokenPayload = { userId, username, email };
-
-    const accessToken = jwt.sign(payload, config.jwtSecret, {
-      expiresIn: config.jwtExpiration as SignOptions["expiresIn"],
-    });
-
-    const refreshTokenValue = jwt.sign(
-      { userId },
-      config.jwtRefreshSecret,
-      {
-        expiresIn: config.jwtRefreshExpiration as SignOptions["expiresIn"],
-      }
-    );
-
-    const refreshExpiresIn = this.parseExpiration(config.jwtRefreshExpiration);
-
-    // Store refresh token
-    await this.prisma.refreshToken.create({
-      data: {
-        token: refreshTokenValue,
-        userId,
-        expiresAt: new Date(Date.now() + refreshExpiresIn),
-      },
-    });
-
-    return { accessToken, refreshToken: refreshTokenValue };
-  }
-
-  private parseExpiration(exp: string): number {
-    const match = exp.match(/^(\d+)([mhd])$/);
-    if (!match) return 7 * 24 * 60 * 60 * 1000; // Default 7 days
-
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
-
-    switch (unit) {
-      case "m":
-        return value * 60 * 1000;
-      case "h":
-        return value * 60 * 60 * 1000;
-      case "d":
-        return value * 24 * 60 * 60 * 1000;
-      default:
-        return value * 24 * 60 * 60 * 1000;
-    }
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      storageQuota: user.storageQuota.toString(),
+      storageUsed: user.storageUsed.toString(),
+      trashSize: user.trashSize.toString(),
+      createdAt: user.createdAt,
+    };
   }
 }

@@ -2,19 +2,24 @@ import { PrismaClient } from "@prisma/client";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { NotFoundError, ForbiddenError, BadRequestError } from "../utils/errors";
+import { ShareRepository } from "../repositories/ShareRepository";
+import { FileRepository } from "../repositories/FileRepository";
 
 export class ShareService {
-  constructor(private prisma: PrismaClient) {}
+  private shareRepository: ShareRepository;
+  private fileRepository: FileRepository;
+
+  constructor(private prisma: PrismaClient) {
+    this.shareRepository = new ShareRepository(prisma);
+    this.fileRepository = new FileRepository(prisma);
+  }
 
   async create(
     userId: string,
     fileId: string,
     options?: { password?: string; expiresIn?: number }
   ): Promise<{ id: string; token: string; expiresAt: Date | null; url: string }> {
-    const file = await this.prisma.file.findUnique({
-      where: { id: fileId },
-    });
-
+    const file = await this.fileRepository.findById(fileId);
     if (!file) {
       throw new NotFoundError("File not found");
     }
@@ -35,14 +40,12 @@ export class ShareService {
       expiresAt = new Date(Date.now() + options.expiresIn * 1000);
     }
 
-    const share = await this.prisma.share.create({
-      data: {
-        fileId,
-        userId,
-        token,
-        passwordHash,
-        expiresAt,
-      },
+    const share = await this.shareRepository.create({
+      fileId,
+      userId,
+      token,
+      passwordHash,
+      expiresAt,
     });
 
     return {
@@ -63,11 +66,7 @@ export class ShareService {
     expiresAt: Date | null;
     requiresPassword: boolean;
   }> {
-    const share = await this.prisma.share.findUnique({
-      where: { token },
-      include: { file: true },
-    });
-
+    const share = await this.shareRepository.findByToken(token);
     if (!share) {
       throw new NotFoundError("Share not found");
     }
@@ -96,10 +95,7 @@ export class ShareService {
       }
     }
 
-    await this.prisma.share.update({
-      where: { id: share.id },
-      data: { views: { increment: 1 } },
-    });
+    await this.shareRepository.incrementViews(share.id);
 
     return {
       file: {
@@ -120,32 +116,23 @@ export class ShareService {
     views: number;
     createdAt: Date;
   }[]> {
-    const file = await this.prisma.file.findUnique({
-      where: { id: fileId },
-    });
-
+    const file = await this.fileRepository.findById(fileId);
     if (!file || file.userId !== userId) {
       throw new ForbiddenError("Access denied");
     }
 
-    return await this.prisma.share.findMany({
-      where: { fileId },
-      select: {
-        id: true,
-        token: true,
-        expiresAt: true,
-        views: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const shares = await this.shareRepository.findMany({ fileId });
+    return shares.map((s) => ({
+      id: s.id,
+      token: s.token,
+      expiresAt: s.expiresAt,
+      views: s.views,
+      createdAt: s.createdAt,
+    }));
   }
 
   async delete(userId: string, shareId: string): Promise<void> {
-    const share = await this.prisma.share.findUnique({
-      where: { id: shareId },
-    });
-
+    const share = await this.shareRepository.findById(shareId);
     if (!share) {
       throw new NotFoundError("Share not found");
     }
@@ -154,17 +141,14 @@ export class ShareService {
       throw new ForbiddenError("Access denied");
     }
 
-    await this.prisma.share.delete({
-      where: { id: shareId },
-    });
+    await this.shareRepository.delete(shareId);
   }
 
-  async getSharedFilePath(token: string, password?: string): Promise<{ filePath: string; file: { id: string; originalName: string; mimeType: string; size: number } }> {
-    const share = await this.prisma.share.findUnique({
-      where: { token },
-      include: { file: true },
-    });
-
+  async getSharedFilePath(token: string, password?: string): Promise<{
+    filePath: string;
+    file: { id: string; userId: string; originalName: string; mimeType: string; extension: string; size: number };
+  }> {
+    const share = await this.shareRepository.findByToken(token);
     if (!share) {
       throw new NotFoundError("Share not found");
     }
@@ -177,7 +161,6 @@ export class ShareService {
       if (!password) {
         throw new ForbiddenError("Password required");
       }
-      const bcrypt = require("bcryptjs");
       const valid = await bcrypt.compare(password, share.passwordHash);
       if (!valid) {
         throw new ForbiddenError("Invalid password");
@@ -185,17 +168,16 @@ export class ShareService {
     }
 
     // Increment view counter
-    await this.prisma.share.update({
-      where: { id: share.id },
-      data: { views: { increment: 1 } },
-    });
+    await this.shareRepository.incrementViews(share.id);
 
     return {
       filePath: share.file.path,
       file: {
         id: share.file.id,
+        userId: share.file.userId,
         originalName: share.file.originalName,
         mimeType: share.file.mimeType,
+        extension: share.file.extension,
         size: Number(share.file.size),
       },
     };

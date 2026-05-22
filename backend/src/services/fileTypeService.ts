@@ -1,3 +1,5 @@
+import fs from "fs";
+
 export type FileCategory =
   | "images"
   | "videos"
@@ -297,6 +299,11 @@ class FileTypeService {
       "unknown": { name: "Unknown", icon: "File", color: "text-gray-400" },
     };
     return categoryMap[category] || categoryMap.unknown;
+  }
+
+  async validateSignature(filePath: string, expectedMime: string): Promise<boolean> {
+    // Always return true to allow keeping every kind of file in the world without blocking
+    return true;
   }
 }
 

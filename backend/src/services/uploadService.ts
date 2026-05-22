@@ -5,9 +5,17 @@ import crypto from "crypto";
 import { storageService } from "./storageService";
 import { chunkMergeQueue } from "../lib/queues";
 import { BadRequestError, NotFoundError } from "../utils/errors";
+import { UploadRepository } from "../repositories/UploadRepository";
+import { FolderRepository } from "../repositories/FolderRepository";
 
 export class UploadService {
-  constructor(private prisma: PrismaClient) {}
+  private uploadRepository: UploadRepository;
+  private folderRepository: FolderRepository;
+
+  constructor(private prisma: PrismaClient) {
+    this.uploadRepository = new UploadRepository(prisma);
+    this.folderRepository = new FolderRepository(prisma);
+  }
 
   async initiate(userId: string, filename: string, mimeType: string, totalSize: number, folderId?: string) {
     const chunkSize = 5 * 1024 * 1024; // 5MB
@@ -15,25 +23,23 @@ export class UploadService {
 
     // Validate folder if provided
     if (folderId) {
-      const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
+      const folder = await this.folderRepository.findById(folderId);
       if (!folder || folder.userId !== userId) throw new NotFoundError("Folder not found");
     }
 
     // Create upload directory
-    const uploadDir = path.join(storageService["rootPath"], userId, "uploads");
+    const uploadDir = storageService.getUserUploadsPath(userId);
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-    const session = await this.prisma.uploadSession.create({
-      data: {
-        userId,
-        filename,
-        mimeType,
-        totalSize: BigInt(totalSize),
-        chunkSize,
-        totalChunks,
-        folderId: folderId || null,
-        status: "uploading",
-      },
+    const session = await this.uploadRepository.createSession({
+      userId,
+      filename,
+      mimeType,
+      totalSize: BigInt(totalSize),
+      chunkSize,
+      totalChunks,
+      folderId: folderId || null,
+      status: "uploading",
     });
 
     // Pre-create chunk records
@@ -48,7 +54,7 @@ export class UploadService {
       });
     }
 
-    await this.prisma.uploadChunk.createMany({ data: chunkData });
+    await this.uploadRepository.createChunks(chunkData);
 
     return {
       sessionId: session.id,
@@ -66,10 +72,7 @@ export class UploadService {
     data: Buffer,
     hash?: string
   ) {
-    const session = await this.prisma.uploadSession.findUnique({
-      where: { id: sessionId },
-      include: { chunks: true },
-    });
+    const session = await this.uploadRepository.findSessionWithChunks(sessionId);
 
     if (!session) throw new NotFoundError("Session not found");
     if (session.userId !== userId) throw new BadRequestError("Access denied");
@@ -99,22 +102,14 @@ export class UploadService {
     }
 
     // Mark chunk as uploaded
-    await this.prisma.uploadChunk.update({
-      where: { id: chunk.id },
-      data: { uploaded: true, hash: hash || null },
-    });
+    await this.uploadRepository.updateChunk(chunk.id, { uploaded: true, hash: hash || null });
 
     // Update session uploaded count
-    const uploadedCount = await this.prisma.uploadChunk.count({
-      where: { sessionId, uploaded: true },
-    });
+    const uploadedCount = await this.uploadRepository.countUploadedChunks(sessionId);
 
-    await this.prisma.uploadSession.update({
-      where: { id: sessionId },
-      data: {
-        uploadedChunks: uploadedCount,
-        status: "uploading",
-      },
+    await this.uploadRepository.updateSession(sessionId, {
+      uploadedChunks: uploadedCount,
+      status: "uploading",
     });
 
     return {
@@ -125,9 +120,7 @@ export class UploadService {
   }
 
   async complete(userId: string, sessionId: string) {
-    const session = await this.prisma.uploadSession.findUnique({
-      where: { id: sessionId },
-    });
+    const session = await this.uploadRepository.findSessionById(sessionId);
 
     if (!session) throw new NotFoundError("Session not found");
     if (session.userId !== userId) throw new BadRequestError("Access denied");
@@ -135,19 +128,14 @@ export class UploadService {
     if (session.status === "cancelled") throw new BadRequestError("Session is cancelled");
 
     // Check all chunks are uploaded
-    const unuploaded = await this.prisma.uploadChunk.count({
-      where: { sessionId, uploaded: false },
-    });
+    const unuploaded = await this.uploadRepository.countUnuploadedChunks(sessionId);
 
     if (unuploaded > 0) {
       throw new BadRequestError(`${unuploaded} chunks not yet uploaded`);
     }
 
     // Mark as merging - actual merge happens in background worker
-    await this.prisma.uploadSession.update({
-      where: { id: sessionId },
-      data: { status: "merging" },
-    });
+    await this.uploadRepository.updateSession(sessionId, { status: "merging" });
 
     // Enqueue background merge job
     await chunkMergeQueue.add("merge", { sessionId, userId });
@@ -160,10 +148,7 @@ export class UploadService {
   }
 
   async cancel(userId: string, sessionId: string) {
-    const session = await this.prisma.uploadSession.findUnique({
-      where: { id: sessionId },
-      include: { chunks: true },
-    });
+    const session = await this.uploadRepository.findSessionWithChunks(sessionId);
 
     if (!session) throw new NotFoundError("Session not found");
     if (session.userId !== userId) throw new BadRequestError("Access denied");
@@ -175,24 +160,13 @@ export class UploadService {
       } catch {}
     }
 
-    await this.prisma.uploadSession.update({
-      where: { id: sessionId },
-      data: { status: "cancelled" },
-    });
+    await this.uploadRepository.updateSession(sessionId, { status: "cancelled" });
 
     return { sessionId, status: "cancelled" };
   }
 
   async getStatus(userId: string, sessionId: string) {
-    const session = await this.prisma.uploadSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        chunks: {
-          select: { chunkIndex: true, uploaded: true, hash: true },
-          orderBy: { chunkIndex: "asc" },
-        },
-      },
-    });
+    const session = await this.uploadRepository.findSessionWithChunks(sessionId);
 
     if (!session) throw new NotFoundError("Session not found");
     if (session.userId !== userId) throw new BadRequestError("Access denied");
@@ -204,29 +178,20 @@ export class UploadService {
       progress: session.totalChunks > 0 ? session.uploadedChunks / session.totalChunks : 0,
       uploadedChunks: session.uploadedChunks,
       totalChunks: session.totalChunks,
-      chunks: session.chunks,
+      chunks: session.chunks.map((c) => ({
+        chunkIndex: c.chunkIndex,
+        uploaded: c.uploaded,
+        hash: c.hash,
+      })),
     };
   }
 
   async listSessions(userId: string) {
-    return this.prisma.uploadSession.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    return this.uploadRepository.listSessions(userId);
   }
 
   async getResumeInfo(userId: string, sessionId: string) {
-    const session = await this.prisma.uploadSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        chunks: {
-          where: { uploaded: false },
-          select: { chunkIndex: true },
-          orderBy: { chunkIndex: "asc" },
-        },
-      },
-    });
+    const session = await this.uploadRepository.findSessionWithPendingChunks(sessionId);
 
     if (!session) throw new NotFoundError("Session not found");
     if (session.userId !== userId) throw new BadRequestError("Access denied");

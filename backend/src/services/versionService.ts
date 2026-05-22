@@ -6,29 +6,41 @@ import { pipeline } from "stream/promises";
 import { storageService } from "./storageService";
 import { versionCleanupQueue } from "../lib/queues";
 import { NotFoundError, ForbiddenError } from "../utils/errors";
+import { VersionRepository } from "../repositories/VersionRepository";
+import { FileRepository } from "../repositories/FileRepository";
 
 export class VersionService {
-  constructor(private prisma: PrismaClient) {}
+  private versionRepository: VersionRepository;
+  private fileRepository: FileRepository;
+
+  constructor(private prisma: PrismaClient) {
+    this.versionRepository = new VersionRepository(prisma);
+    this.fileRepository = new FileRepository(prisma);
+  }
 
   async createVersion(userId: string, fileId: string): Promise<any> {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+    const file = await this.fileRepository.findById(fileId);
     if (!file) throw new NotFoundError("File not found");
     if (file.userId !== userId) throw new ForbiddenError("Access denied");
 
-    const latestVersion = await this.prisma.fileVersion.findFirst({
-      where: { fileId },
-      orderBy: { version: "desc" },
-    });
-
+    const latestVersion = await this.versionRepository.findLatest(fileId);
     const newVersion = (latestVersion?.version || 0) + 1;
 
     // Version storage directory
-    const versionDir = path.join(storageService["rootPath"], userId, "versions");
+    const versionDir = storageService.getUserVersionsPath(userId);
     if (!fs.existsSync(versionDir)) fs.mkdirSync(versionDir, { recursive: true });
 
     const ext = path.extname(file.originalName);
     const versionStoredName = `${fileId}_v${newVersion}${ext}`;
     const versionPath = path.join(versionDir, versionStoredName);
+
+    // Enforce path traversal defense
+    if (!storageService.isSafePath(userId, file.path)) {
+      throw new ForbiddenError("Access denied: Invalid source path");
+    }
+    if (!storageService.isSafePath(userId, versionPath)) {
+      throw new ForbiddenError("Access denied: Invalid destination path");
+    }
 
     // Stream-based copy for large files (memory efficient)
     if (fs.existsSync(file.path)) {
@@ -50,22 +62,17 @@ export class VersionService {
       });
     }
 
-    const version = await this.prisma.fileVersion.create({
-      data: {
-        fileId,
-        version: newVersion,
-        storedName: versionStoredName,
-        path: versionPath,
-        size: file.size,
-        hash,
-      },
+    const version = await this.versionRepository.create({
+      fileId,
+      version: newVersion,
+      storedName: versionStoredName,
+      path: versionPath,
+      size: file.size,
+      hash,
     });
 
     // Update file's current version
-    await this.prisma.file.update({
-      where: { id: fileId },
-      data: { currentVersion: newVersion },
-    });
+    await this.fileRepository.update(fileId, { currentVersion: newVersion });
 
     // Enqueue version cleanup
     await versionCleanupQueue.add("cleanup", { fileId }).catch(() => {});
@@ -74,26 +81,28 @@ export class VersionService {
   }
 
   async listVersions(userId: string, fileId: string) {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+    const file = await this.fileRepository.findById(fileId);
     if (!file) throw new NotFoundError("File not found");
     if (file.userId !== userId) throw new ForbiddenError("Access denied");
 
-    return this.prisma.fileVersion.findMany({
-      where: { fileId },
-      orderBy: { version: "desc" },
-    });
+    return this.versionRepository.findMany({ fileId });
   }
 
   async restoreVersion(userId: string, fileId: string, versionNumber: number) {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+    const file = await this.fileRepository.findById(fileId);
     if (!file) throw new NotFoundError("File not found");
     if (file.userId !== userId) throw new ForbiddenError("Access denied");
 
-    const version = await this.prisma.fileVersion.findFirst({
-      where: { fileId, version: versionNumber },
-    });
-
+    const version = await this.versionRepository.findFirst({ fileId, version: versionNumber });
     if (!version) throw new NotFoundError("Version not found");
+
+    // Enforce path traversal defense
+    if (!storageService.isSafePath(userId, version.path)) {
+      throw new ForbiddenError("Access denied: Invalid version path");
+    }
+    if (!storageService.isSafePath(userId, file.path)) {
+      throw new ForbiddenError("Access denied: Invalid destination path");
+    }
 
     // Save current version before restoring
     await this.createVersion(userId, fileId);
@@ -107,35 +116,34 @@ export class VersionService {
     }
 
     // Update file size and hash
-    await this.prisma.file.update({
-      where: { id: fileId },
-      data: {
-        size: version.size,
-        hash: version.hash,
-        currentVersion: versionNumber,
-      },
+    await this.fileRepository.update(fileId, {
+      size: version.size,
+      hash: version.hash,
+      currentVersion: versionNumber,
     });
 
     return { restored: versionNumber, fileId };
   }
 
   async deleteVersion(userId: string, fileId: string, versionNumber: number) {
-    const file = await this.prisma.file.findUnique({ where: { id: fileId } });
+    const file = await this.fileRepository.findById(fileId);
     if (!file) throw new NotFoundError("File not found");
     if (file.userId !== userId) throw new ForbiddenError("Access denied");
 
-    const version = await this.prisma.fileVersion.findFirst({
-      where: { fileId, version: versionNumber },
-    });
-
+    const version = await this.versionRepository.findFirst({ fileId, version: versionNumber });
     if (!version) throw new NotFoundError("Version not found");
+
+    // Enforce path traversal defense
+    if (!storageService.isSafePath(userId, version.path)) {
+      throw new ForbiddenError("Access denied: Invalid version path");
+    }
 
     // Delete physical file
     try {
       if (fs.existsSync(version.path)) fs.unlinkSync(version.path);
     } catch {}
 
-    await this.prisma.fileVersion.delete({ where: { id: version.id } });
+    await this.versionRepository.delete(version.id);
 
     return { deleted: versionNumber, fileId };
   }

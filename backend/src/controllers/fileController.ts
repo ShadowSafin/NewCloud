@@ -3,7 +3,28 @@ import path from "path";
 import fs from "fs";
 import { FileService } from "../services/fileService";
 import { AuthenticatedRequest } from "../types";
-import { BadRequestError, NotFoundError } from "../utils/errors";
+import { BadRequestError, NotFoundError, ForbiddenError } from "../utils/errors";
+import { storageService } from "../services/storageService";
+import { fileTypeService } from "../services/fileTypeService";
+
+const shouldSandbox = (mimeType: string, extension: string): boolean => {
+  const category = fileTypeService.getCategory(mimeType, extension);
+  const ext = (extension || "").toLowerCase();
+  const mime = mimeType.toLowerCase();
+
+  return (
+    category === "code" ||
+    category === "databases" ||
+    category === "unknown" ||
+    mime.startsWith("text/") ||
+    ext === ".html" ||
+    ext === ".htm" ||
+    ext === ".svg" ||
+    ext === ".xml" ||
+    ext === ".js" ||
+    ext === ".json"
+  );
+};
 
 export class FileController {
   constructor(private fileService: FileService) {}
@@ -61,12 +82,25 @@ export class FileController {
     const category = req.query.category as string | undefined;
     const minSize = req.query.minSize ? Number(req.query.minSize) : undefined;
     const maxSize = req.query.maxSize ? Number(req.query.maxSize) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const offset = req.query.offset ? Number(req.query.offset) : undefined;
 
-    const files = await this.fileService.findAll(userId, folderId, search, { category, minSize, maxSize });
+    const { files, totalCount } = await this.fileService.findAll(userId, folderId, search, {
+      category,
+      minSize,
+      maxSize,
+      limit,
+      offset,
+    });
 
     res.status(200).json({
       success: true,
       data: files,
+      pagination: {
+        total: totalCount,
+        limit: limit ?? files.length,
+        offset: offset ?? 0,
+      },
     });
   };
 
@@ -94,6 +128,15 @@ export class FileController {
 
     const file = await this.fileService.findById(userId, id);
     const filePath = await this.fileService.getFilePath(userId, id);
+
+    // Enforce path traversal defense
+    if (!storageService.isSafePath(userId, filePath)) {
+      throw new ForbiddenError("Access denied: Invalid file path");
+    }
+
+    if (shouldSandbox(file.mimeType, file.extension)) {
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox;");
+    }
 
     res.setHeader("Content-Type", file.mimeType);
     res.setHeader(
@@ -215,6 +258,11 @@ export class FileController {
       throw new NotFoundError("Thumbnail not found");
     }
 
+    // Enforce path traversal defense
+    if (!storageService.isSafePath(userId, thumbnailPath)) {
+      throw new ForbiddenError("Access denied: Invalid thumbnail path");
+    }
+
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Content-Type", "image/jpeg");
     res.sendFile(path.resolve(thumbnailPath));
@@ -246,6 +294,11 @@ export class FileController {
     const file = await this.fileService.findById(userId, id);
     const filePath = await this.fileService.getFilePath(userId, id);
 
+    // Enforce path traversal defense
+    if (!storageService.isSafePath(userId, filePath)) {
+      throw new ForbiddenError("Access denied: Invalid file path");
+    }
+
     if (!fs.existsSync(filePath)) {
       throw new NotFoundError("File not found on disk");
     }
@@ -253,6 +306,10 @@ export class FileController {
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = req.headers.range;
+
+    if (shouldSandbox(file.mimeType, file.extension)) {
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox;");
+    }
 
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");

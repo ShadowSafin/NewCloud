@@ -21,5 +21,6 @@ router.post("/:sessionId/cancel", authenticate, asyncHandler(uploadController.ca
 router.get("/status/:sessionId", authenticate, asyncHandler(uploadController.getStatus));
 router.get("/sessions", authenticate, asyncHandler(uploadController.listSessions));
 router.get("/:sessionId/resume", authenticate, asyncHandler(uploadController.resume));
+router.get("/session/:id", authenticate, asyncHandler(uploadController.getSessionUploadedChunks));
 
 export default router;

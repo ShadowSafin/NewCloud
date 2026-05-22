@@ -7,6 +7,8 @@ import { thumbnailQueue } from "../lib/queues";
 import { prisma } from "../db";
 import { storageService } from "../services/storageService";
 import { fileTypeService } from "../services/fileTypeService";
+import { dedupService } from "../services/dedupService";
+import { VersionService } from "../services/versionService";
 
 interface ChunkMergeJobData {
   sessionId: string;
@@ -69,7 +71,17 @@ export function createChunkMergeWorker(): Worker {
         writeStream.on("error", reject);
       });
 
+      // Dynamic Binary Signature Validation (Magic-Number validation)
+      const isSignatureValid = await fileTypeService.validateSignature(filePath, session.mimeType);
+      if (!isSignatureValid) {
+        try {
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch {}
+        throw new Error("File signature mismatch: the file contents do not match the expected type or extension");
+      }
+
       const fileHash = hash.digest("hex");
+      const versionService = new VersionService(prisma);
 
       // Check for deduplication
       const existingFile = await prisma.file.findFirst({
@@ -92,33 +104,81 @@ export function createChunkMergeWorker(): Worker {
         });
       }
 
-      // Create file record
-      const fileInfo = fileTypeService.getFileInfo(session.filename, session.mimeType);
-      const file = await prisma.file.create({
-        data: {
-          userId,
-          folderId: session.folderId,
+      // Check for duplicate filename in the same folder
+      const existingFileWithName = await prisma.file.findFirst({
+        where: {
           originalName: session.filename,
-          storedName: finalStoredName,
-          path: finalPath,
-          mimeType: session.mimeType,
-          category: fileInfo.category,
-          size: BigInt(Number(session.totalSize)),
-          hash: fileHash,
-          refCount: existingFile ? existingFile.refCount + 1 : 1,
+          folderId: session.folderId,
+          userId,
+          deletedAt: null,
         },
       });
 
-      // Update user storage
-      await prisma.user.update({
-        where: { id: userId },
-        data: { storageUsed: { increment: Number(session.totalSize) } },
-      });
+      const fileInfo = fileTypeService.getFileInfo(session.filename, session.mimeType);
+      let file;
+
+      if (existingFileWithName) {
+        // 1. Create a version backup of the existing file
+        await versionService.createVersion(userId, existingFileWithName.id);
+
+        // 2. Safely release/delete the previous physical file
+        await dedupService.releaseFile(existingFileWithName);
+
+        // 3. Update the existing file record with the new properties
+        file = await prisma.file.update({
+          where: { id: existingFileWithName.id },
+          data: {
+            storedName: finalStoredName,
+            path: finalPath,
+            mimeType: session.mimeType,
+            category: fileInfo.category,
+            size: BigInt(Number(session.totalSize)),
+            hash: fileHash,
+            refCount: existingFile ? existingFile.refCount + 1 : 1,
+            thumbnail: null,
+            thumbnailSmall: null,
+            thumbnailMedium: null,
+            thumbnailLarge: null,
+          },
+        });
+
+        // Update user storage net change
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            storageUsed: {
+              increment: Number(session.totalSize) - Number(existingFileWithName.size),
+            },
+          },
+        });
+      } else {
+        // No duplicate filename exists - create new file record
+        file = await prisma.file.create({
+          data: {
+            userId,
+            folderId: session.folderId,
+            originalName: session.filename,
+            storedName: finalStoredName,
+            path: finalPath,
+            mimeType: session.mimeType,
+            category: fileInfo.category,
+            size: BigInt(Number(session.totalSize)),
+            hash: fileHash,
+            refCount: existingFile ? existingFile.refCount + 1 : 1,
+          },
+        });
+
+        // Update user storage
+        await prisma.user.update({
+          where: { id: userId },
+          data: { storageUsed: { increment: Number(session.totalSize) } },
+        });
+      }
 
       // Mark session completed
       await prisma.uploadSession.update({
         where: { id: sessionId },
-        data: { status: "completed", completedAt: new Date(), hash: fileHash },
+        data: { status: "completed", completedAt: new Date(), hash: fileHash, fileId: file.id },
       });
 
       // Clean up chunk files

@@ -20,13 +20,143 @@ import { UploadQueuePanel } from "@/components/upload/upload-queue-panel";
 import { ToastContainer } from "@/components/ui/toast-container";
 import { ContextMenu, useContextMenu, ContextMenuItem } from "@/components/ui/context-menu";
 import { useUploadStore } from "@/store/uploadStore";
-import { useKeyboardShortcuts, formatShortcut } from "@/hooks/useKeyboardShortcuts";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { OperationProgressModal } from "@/components/ui/operation-progress";
 import {
   FileX, Upload, Clock, Star, Trash2, Copy, Scissors, ClipboardPaste,
-  FolderPlus, ArrowLeft, ArrowRight,
+  FolderPlus, ArrowLeft, ArrowRight, Folder, Film, FileText, Music, Image, Code,
 } from "lucide-react";
+import { LandingPage } from "@/components/landing/LandingPage";
+import { VirtualizedContainer } from "@/components/file/virtualized-container";
+import { FileCategory } from "@/lib/fileTypes";
+
+// ─────────────────────────────────────────────
+// Category Card Definitions
+// ─────────────────────────────────────────────
+
+interface CategoryDef {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  categories: FileCategory[];
+  colorClass: string;
+  glowClass: string;
+  bgClass: string;
+  borderHoverClass: string;
+}
+
+const CATEGORY_DEFS: CategoryDef[] = [
+  {
+    id: "projects",
+    label: "Projects",
+    icon: Folder,
+    categories: ["code", "datasets", "spreadsheets", "presentations", "databases", "cad", "3d-models", "archives", "executables"],
+    colorClass: "text-cyan-400",
+    glowClass: "glow-cyan",
+    bgClass: "bg-cyan-500/5",
+    borderHoverClass: "hover:border-cyan-400/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.2)]",
+  },
+  {
+    id: "photos",
+    label: "Photos",
+    icon: Image,
+    categories: ["images"],
+    colorClass: "text-purple-400",
+    glowClass: "glow-purple",
+    bgClass: "bg-purple-500/5",
+    borderHoverClass: "hover:border-purple-400/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]",
+  },
+  {
+    id: "recordings",
+    label: "Recordings",
+    icon: Film,
+    categories: ["videos"],
+    colorClass: "text-blue-400",
+    glowClass: "glow-blue",
+    bgClass: "bg-blue-500/5",
+    borderHoverClass: "hover:border-blue-400/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)]",
+  },
+  {
+    id: "documents",
+    label: "Documents",
+    icon: FileText,
+    categories: ["documents", "ebooks"],
+    colorClass: "text-emerald-400",
+    glowClass: "glow-cyan",
+    bgClass: "bg-emerald-500/5",
+    borderHoverClass: "hover:border-emerald-400/40 hover:shadow-[0_0_20px_rgba(52,211,153,0.2)]",
+  },
+  {
+    id: "audio",
+    label: "Audio",
+    icon: Music,
+    categories: ["audio"],
+    colorClass: "text-pink-400",
+    glowClass: "glow-magenta",
+    bgClass: "bg-pink-500/5",
+    borderHoverClass: "hover:border-pink-400/40 hover:shadow-[0_0_20px_rgba(236,72,153,0.2)]",
+  },
+];
+
+// ─────────────────────────────────────────────
+// Category Shortcut Card
+// ─────────────────────────────────────────────
+
+function CategoryCard({
+  def,
+  count,
+  isActive,
+  onClick,
+}: {
+  def: CategoryDef;
+  count: number;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const Icon = def.icon;
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "group relative flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border transition-all duration-300 cursor-pointer select-none text-left",
+        "glass-card",
+        def.borderHoverClass,
+        isActive
+          ? `border-white/20 shadow-[0_0_25px_rgba(255,255,255,0.1)] ${def.bgClass}`
+          : "border-white/[0.06]",
+      ].join(" ")}
+      style={{ flex: "1 1 0", minWidth: 0 }}
+    >
+      {/* Active indicator glow ring */}
+      {isActive && (
+        <span className="absolute inset-0 rounded-2xl border border-white/20 animate-pulse pointer-events-none" />
+      )}
+
+      {/* Icon */}
+      <div
+        className={[
+          "flex items-center justify-center w-12 h-12 rounded-xl border border-white/[0.05] transition-all duration-300 group-hover:scale-110",
+          def.bgClass,
+        ].join(" ")}
+      >
+        <Icon className={["w-6 h-6 transition-all duration-300", def.colorClass, def.glowClass].join(" ")} />
+      </div>
+
+      {/* Label + count */}
+      <div className="text-center">
+        <p className="text-sm font-semibold text-white/90 group-hover:text-white leading-tight">{def.label}</p>
+        <p className="text-[11px] text-white/40 mt-0.5 font-mono">
+          {count} {count === 1 ? "item" : "items"}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Main Dashboard Content
+// ─────────────────────────────────────────────
 
 function DashboardContent() {
   const router = useRouter();
@@ -34,7 +164,14 @@ function DashboardContent() {
   const view = searchParams.get("view");
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const store = useFileStore();
-  const { items: clipboardItems, action: clipboardAction, paste: clipboardPaste, hasClipboard, copy: clipboardCopy, cut: clipboardCut } = useClipboardStore();
+  const {
+    items: clipboardItems,
+    action: clipboardAction,
+    paste: clipboardPaste,
+    hasClipboard,
+    copy: clipboardCopy,
+    cut: clipboardCut,
+  } = useClipboardStore();
   const { addToast } = useToastStore();
   const { recoverUploads } = useUploadStore();
   const { menu: bgContextMenu, open: openBgContextMenu, close: closeBgContextMenu } = useContextMenu();
@@ -51,9 +188,15 @@ function DashboardContent() {
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
 
   // Cancel stale uploads on page load
   useEffect(() => { recoverUploads(); }, [recoverUploads]);
+
+  // Clear category filter when navigating to a special view
+  useEffect(() => {
+    if (view) setActiveCategoryFilter(null);
+  }, [view]);
 
   const isSpecialView = !!view;
   const isTrashView = view === "trash";
@@ -61,9 +204,28 @@ function DashboardContent() {
   const isStarredView = view === "starred";
 
   const currentDisplayFiles = isSpecialView ? viewFiles : store.files;
-  const localFilteredFiles = localSearch
-    ? currentDisplayFiles.filter((f) => f.originalName.toLowerCase().includes(localSearch.toLowerCase()))
+
+  // Build category counts from all current files (before category filter)
+  const categoryCounts = CATEGORY_DEFS.reduce<Record<string, number>>((acc, def) => {
+    acc[def.id] = currentDisplayFiles.filter(
+      (f) => def.categories.includes(f.category as FileCategory)
+    ).length;
+    return acc;
+  }, {});
+
+  // Apply category filter then local search
+  const categoryFilteredFiles = activeCategoryFilter
+    ? currentDisplayFiles.filter((f) => {
+        const def = CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter);
+        return def ? def.categories.includes(f.category as FileCategory) : true;
+      })
     : currentDisplayFiles;
+
+  const localFilteredFiles = localSearch
+    ? categoryFilteredFiles.filter((f) =>
+        f.originalName.toLowerCase().includes(localSearch.toLowerCase())
+      )
+    : categoryFilteredFiles;
 
   // Fetch data on mount and when folder changes
   useEffect(() => {
@@ -89,7 +251,7 @@ function DashboardContent() {
     }
   }, [isAuthenticated, authLoading, store.currentFolderId, view]);
 
-  // Sort files - Google Drive style (folders first, then sort files)
+  // Sort files
   const sortItems = <T extends { originalName?: string; name?: string; createdAt: string; size?: number; category?: string }>(
     items: T[],
     sortBy: typeof store.sortBy,
@@ -107,8 +269,11 @@ function DashboardContent() {
     });
   };
 
-  const sortedFiles = sortItems(isSpecialView ? localFilteredFiles : store.files, store.sortBy, store.sortOrder);
-  const sortedFolders = sortItems(isSpecialView ? viewFolders : store.folders, store.sortBy, store.sortOrder);
+  const sortedFiles = sortItems(isSpecialView ? localFilteredFiles : localFilteredFiles, store.sortBy, store.sortOrder);
+  // Hide folders when a category filter is active (as folders don't have categories)
+  const sortedFolders = activeCategoryFilter
+    ? []
+    : sortItems(isSpecialView ? viewFolders : store.folders, store.sortBy, store.sortOrder);
 
   const allItems = isSpecialView
     ? (isTrashView
@@ -158,10 +323,9 @@ function DashboardContent() {
     } catch { }
   }, [handleFileDrop]);
 
-  // Background context menu (right-click on empty space)
+  // Background context menu
   const handleBgContextMenu = useCallback((e: React.MouseEvent) => {
-    // Only trigger if clicking on the background, not on a file/folder
-    if ((e.target as HTMLElement).closest('[data-file-card]')) return;
+    if ((e.target as HTMLElement).closest("[data-file-card]")) return;
 
     const items: ContextMenuItem[] = [
       { label: "New Folder", icon: <FolderPlus className="w-4 h-4" />, shortcut: "mod+shift+N", onClick: () => setIsNewFolderOpen(true) },
@@ -197,8 +361,8 @@ function DashboardContent() {
   const handleCopy = useCallback(() => {
     const { files, folders } = store;
     const items = [
-      ...files.filter(f => store.selectedIds.has(f.id)).map(f => ({ id: f.id, type: "file" as const, name: f.originalName })),
-      ...folders.filter(f => store.selectedIds.has(f.id)).map(f => ({ id: f.id, type: "folder" as const, name: f.name }))
+      ...files.filter((f) => store.selectedIds.has(f.id)).map((f) => ({ id: f.id, type: "file" as const, name: f.originalName })),
+      ...folders.filter((f) => store.selectedIds.has(f.id)).map((f) => ({ id: f.id, type: "folder" as const, name: f.name })),
     ];
     if (items.length > 0) {
       clipboardCopy(items, store.currentFolderId);
@@ -210,8 +374,8 @@ function DashboardContent() {
   const handleCut = useCallback(() => {
     const { files, folders } = store;
     const items = [
-      ...files.filter(f => store.selectedIds.has(f.id)).map(f => ({ id: f.id, type: "file" as const, name: f.originalName })),
-      ...folders.filter(f => store.selectedIds.has(f.id)).map(f => ({ id: f.id, type: "folder" as const, name: f.name }))
+      ...files.filter((f) => store.selectedIds.has(f.id)).map((f) => ({ id: f.id, type: "file" as const, name: f.originalName })),
+      ...folders.filter((f) => store.selectedIds.has(f.id)).map((f) => ({ id: f.id, type: "folder" as const, name: f.name })),
     ];
     if (items.length > 0) {
       clipboardCut(items, store.currentFolderId);
@@ -224,14 +388,14 @@ function DashboardContent() {
     if (selectedCount > 0) setConfirmBatchTrash(true);
   }, [selectedCount]);
 
-  // Permanent delete (shift+delete)
+  // Permanent delete
   const handlePermanentDelete = useCallback(async () => {
     if (isTrashView && selectedCount > 0) {
       setIsBatchProcessing(true);
       const ids = Array.from(store.selectedIds);
       for (const id of ids) {
         try {
-          const file = store.files.find(f => f.id === id);
+          const file = store.files.find((f) => f.id === id);
           if (file) await store.permanentDeleteFile(id);
         } catch { }
       }
@@ -257,7 +421,7 @@ function DashboardContent() {
   const handleOpen = useCallback(() => {
     if (selectedCount === 1) {
       const id = Array.from(store.selectedIds)[0];
-      const file = sortedFiles.find(f => f.id === id);
+      const file = sortedFiles.find((f) => f.id === id);
       if (file) {
         setPreviewFile(file);
         setPreviewIndex(sortedFiles.indexOf(file));
@@ -266,33 +430,32 @@ function DashboardContent() {
   }, [store.selectedIds, sortedFiles]);
 
   // Keyboard shortcuts
-  useKeyboardShortcuts({
-    // Selection
-    "mod+a": () => store.selectAllInFolder(),
-    "mod+d": () => { if (selectedCount > 0) handleDuplicate(); },
-    "escape": () => { store.clearSelection(); setPreviewFile(null); },
-
-    // Clipboard
-    "mod+c": () => handleCopy(),
-    "mod+x": () => handleCut(),
-    "mod+v": () => { if (hasClipboard()) handlePaste(); },
-
-    // File operations
-    "delete": () => handleDelete(),
-    "shift+delete": () => handlePermanentDelete(),
-
-    // Navigation & Preview
-    " ": (e) => {
-      e.preventDefault();
-      if (store.selectedIds.size === 1) {
-        const id = Array.from(store.selectedIds)[0];
-        const file = sortedFiles.find((f) => f.id === id);
-        if (file) { setPreviewFile(file); setPreviewIndex(sortedFiles.indexOf(file)); }
-      }
+  useKeyboardShortcuts(
+    {
+      "mod+a": () => store.selectAllInFolder(),
+      "mod+d": () => { if (selectedCount > 0) handleDuplicate(); },
+      "escape": () => { store.clearSelection(); setPreviewFile(null); },
+      "mod+c": () => handleCopy(),
+      "mod+x": () => handleCut(),
+      "mod+v": () => { if (hasClipboard()) handlePaste(); },
+      "delete": () => handleDelete(),
+      "shift+delete": () => handlePermanentDelete(),
+      " ": (e) => {
+        e.preventDefault();
+        if (store.selectedIds.size === 1) {
+          const id = Array.from(store.selectedIds)[0];
+          const file = sortedFiles.find((f) => f.id === id);
+          if (file) { setPreviewFile(file); setPreviewIndex(sortedFiles.indexOf(file)); }
+        }
+      },
+      "enter": () => handleOpen(),
+      "mod+f": (e) => {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
+      },
     },
-    "enter": () => handleOpen(),
-    "mod+f": (e) => { e.preventDefault(); document.querySelector<HTMLInputElement>('input[type="text"]')?.focus(); },
-  }, [store, selectedCount, hasClipboard, handleCopy, handleCut, handlePaste, handleDelete, handlePermanentDelete, handleDuplicate, handleOpen, sortedFiles, isTrashView]);
+    [store, selectedCount, hasClipboard, handleCopy, handleCut, handlePaste, handleDelete, handlePermanentDelete, handleDuplicate, handleOpen, sortedFiles, isTrashView]
+  );
 
   // Batch trash
   const handleBatchTrash = async () => {
@@ -325,6 +488,7 @@ function DashboardContent() {
   const handleFolderNavigate = (folderId: string) => {
     store.setCurrentFolder(folderId);
     setLocalSearch("");
+    setActiveCategoryFilter(null);
   };
 
   const handleBack = () => store.navigateBack();
@@ -343,10 +507,14 @@ function DashboardContent() {
     return (
       <AppShell>
         <div className="flex items-center justify-center h-full">
-          <div className="w-8 h-8 border-2 border-accent-sunset border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
         </div>
       </AppShell>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <LandingPage />;
   }
 
   return (
@@ -357,108 +525,240 @@ function DashboardContent() {
         onSearchChange={setLocalSearch}
       />
 
-      <main className="flex-1 overflow-auto p-6" onContextMenu={handleBgContextMenu}>
-        {/* Navigation bar */}
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={handleBack}
-            disabled={store.historyIndex <= 0}
-            className="p-1.5 rounded-sm hover:bg-canvas-soft transition-colors disabled:opacity-30"
-            title="Back"
-          >
-            <ArrowLeft className="w-4 h-4 text-body-mid" />
-          </button>
-          <button
-            onClick={handleForward}
-            disabled={store.historyIndex >= store.history.length - 1}
-            className="p-1.5 rounded-sm hover:bg-canvas-soft transition-colors disabled:opacity-30"
-            title="Forward"
-          >
-            <ArrowRight className="w-4 h-4 text-body-mid" />
-          </button>
-          <Breadcrumb
-            onNavigate={(id) => store.setCurrentFolder(id)}
-          />
-        </div>
+      <main className="flex-1 overflow-auto" onContextMenu={handleBgContextMenu}>
+        <div className="p-6 space-y-5">
+          {/* Navigation bar */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              disabled={store.historyIndex <= 0}
+              className="p-1.5 rounded-lg hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all disabled:opacity-30"
+              title="Back"
+            >
+              <ArrowLeft className="w-4 h-4 text-white/60" />
+            </button>
+            <button
+              onClick={handleForward}
+              disabled={store.historyIndex >= store.history.length - 1}
+              className="p-1.5 rounded-lg hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all disabled:opacity-30"
+              title="Forward"
+            >
+              <ArrowRight className="w-4 h-4 text-white/60" />
+            </button>
+            <Breadcrumb onNavigate={(id) => store.setCurrentFolder(id)} />
+          </div>
 
-        {/* View title */}
-        {isRecentView && (
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-sm bg-canvas-soft border border-hairline flex items-center justify-center"><Clock className="w-5 h-5 text-body-mid" /></div>
-            <div><h2 className="text-lg text-ink">Recent Files</h2><p className="text-sm text-body-mid">Recently uploaded files</p></div>
-          </div>
-        )}
-        {isStarredView && (
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-sm bg-canvas-soft border border-hairline flex items-center justify-center"><Star className="w-5 h-5 text-body-mid" /></div>
-            <div><h2 className="text-lg text-ink">Starred</h2><p className="text-sm text-body-mid">Your starred files</p></div>
-          </div>
-        )}
-        {isTrashView && (
-          <div className="flex items-center justify-between mb-5">
+          {/* ── Main Drive View ── */}
+          {!isSpecialView && (
+            <>
+              {/* My Drive Header */}
+              <div className="flex items-center justify-between">
+                <h1 className="text-xl font-semibold text-white tracking-tight">My Drive</h1>
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-400/30 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-400/60 text-cyan-300 text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload
+                </button>
+              </div>
+
+              {/* Category Shortcut Cards */}
+              <div className="flex gap-3 flex-wrap sm:flex-nowrap">
+                {CATEGORY_DEFS.map((def) => (
+                  <CategoryCard
+                    key={def.id}
+                    def={def}
+                    count={categoryCounts[def.id] ?? 0}
+                    isActive={activeCategoryFilter === def.id}
+                    onClick={() =>
+                      setActiveCategoryFilter(
+                        activeCategoryFilter === def.id ? null : def.id
+                      )
+                    }
+                  />
+                ))}
+              </div>
+
+              {/* Active filter label */}
+              {activeCategoryFilter && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/40">Filtering by</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/70 font-medium">
+                    {CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter)?.label}
+                  </span>
+                  <button
+                    onClick={() => setActiveCategoryFilter(null)}
+                    className="text-xs text-white/30 hover:text-white/70 transition-colors"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Special View Titles ── */}
+          {isRecentView && (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-sm bg-canvas-soft border border-hairline flex items-center justify-center"><Trash2 className="w-5 h-5 text-body-mid" /></div>
-              <div><h2 className="text-lg text-ink">Trash</h2><p className="text-sm text-body-mid">Deleted files and folders</p></div>
+              <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                <Clock className="w-4.5 h-4.5 text-white/50" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white">Recent Files</h2>
+                <p className="text-xs text-white/40">Recently uploaded files</p>
+              </div>
             </div>
-            {allItems.length > 0 && <button onClick={() => setConfirmEmptyTrash(true)} className="btn-pill text-xs text-destructive border-destructive/30 hover:bg-destructive/10">Empty Trash</button>}
-          </div>
-        )}
-
-        {/* Batch selection toolbar */}
-        {selectedCount > 0 && (
-          <div className="mb-4">
-            <BulkToolbar />
-          </div>
-        )}
-
-        {/* Loading */}
-        {(store.isLoading || viewLoading) ? (
-          <div className={store.viewMode === "grid" ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" : "flex flex-col gap-0.5"}>
-            {(store.viewMode === "grid" ? Array(8).fill(null) : Array(6).fill(null)).map((_, i) => (
-              <div key={i} className={store.viewMode === "grid" ? "aspect-square bg-canvas-soft rounded-sm animate-pulse" : "h-14 bg-canvas-soft rounded-sm animate-pulse"} />
-            ))}
-          </div>
-        ) : allItems.length === 0 ? (
-          /* Empty state */
-          <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-canvas-soft border border-hairline flex items-center justify-center mb-5">
-              {isTrashView ? <Trash2 className="w-7 h-7 text-body-mid" /> : isRecentView ? <Clock className="w-7 h-7 text-body-mid" /> : isStarredView ? <Star className="w-7 h-7 text-body-mid" /> : <FileX className="w-7 h-7 text-body-mid" />}
+          )}
+          {isStarredView && (
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                <Star className="w-4.5 h-4.5 text-white/50" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-white">Starred</h2>
+                <p className="text-xs text-white/40">Your starred files</p>
+              </div>
             </div>
-            <h3 className="text-lg text-ink mb-1">{isTrashView ? "Trash is empty" : isRecentView ? "No recent files" : isStarredView ? "No starred files" : localSearch ? "No files found" : "No files yet"}</h3>
-            <p className="text-sm text-body-mid mb-6 max-w-sm">{isTrashView ? "Deleted files will appear here" : isRecentView ? "Your recently uploaded files will appear here" : isStarredView ? "Star your favorite files for quick access" : localSearch ? `No results for "${localSearch}"` : "Drag and drop files here or click the upload button"}</p>
-            {!isTrashView && !isRecentView && !isStarredView && !localSearch && (
-              <button onClick={() => setIsUploadOpen(true)} className="btn-pill-primary"><Upload className="w-4 h-4" /> Upload Files</button>
-            )}
-          </div>
-        ) : (
-          /* File grid/list */
-          <div className={store.viewMode === "grid" ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" : "flex flex-col gap-0.5"}>
-            {allItems.map((item) =>
-              item.type === "folder" ? (
-                <FolderCard
-                  key={(item.data as any).id}
-                  folder={item.data as any}
-                  viewMode={store.viewMode}
-                  onNavigate={handleFolderNavigate}
-                  isTrashView={isTrashView}
-                  isDropTarget={dragOverFolder === (item.data as any).id}
-                  onDragOver={(e) => handleFolderDragOver(e, (item.data as any).id)}
-                  onDragLeave={handleFolderDragLeave}
-                  onDrop={(e) => handleFolderDrop(e, (item.data as any).id)}
+          )}
+          {isTrashView && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                  <Trash2 className="w-4.5 h-4.5 text-white/50" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white">Trash</h2>
+                  <p className="text-xs text-white/40">Deleted files and folders</p>
+                </div>
+              </div>
+              {allItems.length > 0 && (
+                <button
+                  onClick={() => setConfirmEmptyTrash(true)}
+                  className="text-xs px-3 py-1.5 rounded-full border border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-400/50 transition-all"
+                >
+                  Empty Trash
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Batch selection toolbar */}
+          {selectedCount > 0 && (
+            <div>
+              <BulkToolbar />
+            </div>
+          )}
+
+          {/* ── Content ── */}
+          {(store.isLoading || viewLoading) ? (
+            <div
+              className={
+                store.viewMode === "grid"
+                  ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+                  : "flex flex-col gap-1"
+              }
+            >
+              {(store.viewMode === "grid" ? Array(8).fill(null) : Array(6).fill(null)).map((_, i) => (
+                <div
+                  key={i}
+                  className={
+                    store.viewMode === "grid"
+                      ? "aspect-square bg-white/[0.02] rounded-2xl border border-white/[0.04] animate-pulse"
+                      : "h-12 bg-white/[0.02] rounded-xl border border-white/[0.04] animate-pulse"
+                  }
                 />
-              ) : (
-                <FileCard
-                  key={(item.data as any).id}
-                  file={item.data as FileItem}
-                  viewMode={store.viewMode}
-                  onPreview={() => { setPreviewFile(item.data as FileItem); setPreviewIndex(sortedFiles.indexOf(item.data as FileItem)); }}
-                  isTrashView={isTrashView}
-                  draggable
-                />
-              )
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          ) : allItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-5">
+                {isTrashView ? (
+                  <Trash2 className="w-7 h-7 text-white/30" />
+                ) : isRecentView ? (
+                  <Clock className="w-7 h-7 text-white/30" />
+                ) : isStarredView ? (
+                  <Star className="w-7 h-7 text-white/30" />
+                ) : activeCategoryFilter ? (
+                  (() => {
+                    const def = CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter);
+                    const Icon = def?.icon ?? FileX;
+                    return <Icon className={`w-7 h-7 ${def?.colorClass ?? "text-white/30"}`} />;
+                  })()
+                ) : (
+                  <FileX className="w-7 h-7 text-white/30" />
+                )}
+              </div>
+              <h3 className="text-base font-semibold text-white/70 mb-1">
+                {isTrashView
+                  ? "Trash is empty"
+                  : isRecentView
+                  ? "No recent files"
+                  : isStarredView
+                  ? "No starred files"
+                  : activeCategoryFilter
+                  ? `No ${CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter)?.label ?? "files"} found`
+                  : localSearch
+                  ? "No files found"
+                  : "No files yet"}
+              </h3>
+              <p className="text-xs text-white/30 mb-6 max-w-xs">
+                {isTrashView
+                  ? "Deleted files will appear here"
+                  : isRecentView
+                  ? "Your recently uploaded files will appear here"
+                  : isStarredView
+                  ? "Star your favorite files for quick access"
+                  : activeCategoryFilter
+                  ? "Upload some files to see them here"
+                  : localSearch
+                  ? `No results for "${localSearch}"`
+                  : "Drag and drop files here or click Upload"}
+              </p>
+              {!isTrashView && !isRecentView && !isStarredView && !localSearch && !activeCategoryFilter && (
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-cyan-400/30 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-400/60 text-cyan-300 text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Files
+                </button>
+              )}
+            </div>
+          ) : (
+            <VirtualizedContainer
+              items={allItems}
+              viewMode={store.viewMode}
+              renderItem={(item: any) =>
+                item.type === "folder" ? (
+                  <FolderCard
+                    key={(item.data as any).id}
+                    folder={item.data as any}
+                    viewMode={store.viewMode}
+                    onNavigate={handleFolderNavigate}
+                    isTrashView={isTrashView}
+                    isDropTarget={dragOverFolder === (item.data as any).id}
+                    onDragOver={(e) => handleFolderDragOver(e, (item.data as any).id)}
+                    onDragLeave={handleFolderDragLeave}
+                    onDrop={(e) => handleFolderDrop(e, (item.data as any).id)}
+                  />
+                ) : (
+                  <FileCard
+                    key={(item.data as any).id}
+                    file={item.data as FileItem}
+                    viewMode={store.viewMode}
+                    onPreview={() => {
+                      setPreviewFile(item.data as FileItem);
+                      setPreviewIndex(sortedFiles.indexOf(item.data as FileItem));
+                    }}
+                    isTrashView={isTrashView}
+                    draggable
+                  />
+                )
+              }
+            />
+          )}
+        </div>
       </main>
 
       {/* Modals */}
@@ -473,21 +773,52 @@ function DashboardContent() {
         hasPrev={previewIndex > 0}
         hasNext={previewIndex < sortedFiles.length - 1}
       />
-      <ConfirmDialog open={confirmBatchTrash} onOpenChange={setConfirmBatchTrash} title="Move to Trash" description={`${selectedCount} item(s) will be moved to trash.`} confirmLabel="Move to Trash" variant="destructive" onConfirm={handleBatchTrash} loading={isBatchProcessing} />
-      <ConfirmDialog open={confirmEmptyTrash} onOpenChange={setConfirmEmptyTrash} title="Empty Trash" description="All files in trash will be permanently deleted. This cannot be undone." confirmLabel="Empty Trash" variant="destructive" onConfirm={handleEmptyTrash} loading={isBatchProcessing} />
+      <ConfirmDialog
+        open={confirmBatchTrash}
+        onOpenChange={setConfirmBatchTrash}
+        title="Move to Trash"
+        description={`${selectedCount} item(s) will be moved to trash.`}
+        confirmLabel="Move to Trash"
+        variant="destructive"
+        onConfirm={handleBatchTrash}
+        loading={isBatchProcessing}
+      />
+      <ConfirmDialog
+        open={confirmEmptyTrash}
+        onOpenChange={setConfirmEmptyTrash}
+        title="Empty Trash"
+        description="All files in trash will be permanently deleted. This cannot be undone."
+        confirmLabel="Empty Trash"
+        variant="destructive"
+        onConfirm={handleEmptyTrash}
+        loading={isBatchProcessing}
+      />
 
       <UploadQueuePanel />
       <ToastContainer />
       <OperationProgressModal />
 
-      {bgContextMenu && <ContextMenu x={bgContextMenu.x} y={bgContextMenu.y} items={bgContextMenu.items} onClose={closeBgContextMenu} />}
+      {bgContextMenu && (
+        <ContextMenu
+          x={bgContextMenu.x}
+          y={bgContextMenu.y}
+          items={bgContextMenu.items}
+          onClose={closeBgContextMenu}
+        />
+      )}
     </AppShell>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-canvas"><div className="w-8 h-8 border-2 border-accent-sunset border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-screen bg-[#04020a]">
+          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <DashboardContent />
     </Suspense>
   );

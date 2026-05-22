@@ -335,6 +335,12 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   renameFile: async (id, originalName) => {
+    const previousFiles = get().files;
+    set((state) => ({
+      files: state.files.map((f) =>
+        f.id === id ? { ...f, originalName } : f
+      ),
+    }));
     try {
       const response = await filesApi.update(id, { originalName });
       set((state) => ({
@@ -343,7 +349,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         ),
       }));
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Rename failed" });
+      set({ files: previousFiles, error: error.response?.data?.error || "Rename failed" });
       throw error;
     }
   },
@@ -363,27 +369,36 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   trashFile: async (id) => {
+    const previousFiles = get().files;
+    const previousRecent = get().recentFiles;
+    const previousSelected = get().selectedIds;
+    set((state) => ({
+      files: state.files.filter((f) => f.id !== id),
+      recentFiles: state.recentFiles.filter((f) => f.id !== id),
+      selectedIds: (() => { const s = new Set(state.selectedIds); s.delete(id); return s; })(),
+    }));
     try {
       await filesApi.trash(id);
-      set((state) => ({
-        files: state.files.filter((f) => f.id !== id),
-        recentFiles: state.recentFiles.filter((f) => f.id !== id),
-        selectedIds: (() => { const s = new Set(state.selectedIds); s.delete(id); return s; })(),
-      }));
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Trash failed" });
+      set({
+        files: previousFiles,
+        recentFiles: previousRecent,
+        selectedIds: previousSelected,
+        error: error.response?.data?.error || "Trash failed",
+      });
       throw error;
     }
   },
 
   restoreFile: async (id) => {
+    const previousFiles = get().files;
+    set((state) => ({
+      files: state.files.filter((f) => f.id !== id),
+    }));
     try {
       await filesApi.restore(id);
-      set((state) => ({
-        files: state.files.filter((f) => f.id !== id),
-      }));
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Restore failed" });
+      set({ files: previousFiles, error: error.response?.data?.error || "Restore failed" });
       throw error;
     }
   },
@@ -514,6 +529,16 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   renameFolder: async (id, name) => {
+    const previousFolders = get().folders;
+    const previousBreadcrumb = get().breadcrumb;
+    set((state) => ({
+      folders: state.folders.map((f) =>
+        f.id === id ? { ...f, name } : f
+      ),
+      breadcrumb: state.breadcrumb.map((b) =>
+        b.id === id ? { ...b, name } : b
+      ),
+    }));
     try {
       const response = await foldersApi.update(id, { name });
       set((state) => ({
@@ -525,7 +550,11 @@ export const useFileStore = create<FileState>((set, get) => ({
         ),
       }));
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Rename failed" });
+      set({
+        folders: previousFolders,
+        breadcrumb: previousBreadcrumb,
+        error: error.response?.data?.error || "Rename failed",
+      });
       throw error;
     }
   },
@@ -544,14 +573,20 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   trashFolder: async (id) => {
+    const previousFolders = get().folders;
+    const previousFiles = get().files;
+    set((state) => ({
+      folders: state.folders.filter((f) => f.id !== id),
+      files: state.files.filter((f) => f.folderId !== id),
+    }));
     try {
       await foldersApi.trash(id);
-      set((state) => ({
-        folders: state.folders.filter((f) => f.id !== id),
-        files: state.files.filter((f) => f.folderId !== id),
-      }));
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Trash failed" });
+      set({
+        folders: previousFolders,
+        files: previousFiles,
+        error: error.response?.data?.error || "Trash failed",
+      });
       throw error;
     }
   },
@@ -571,6 +606,12 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   toggleFavorite: async (id) => {
+    const previousFiles = get().files;
+    set((state) => ({
+      files: state.files.map((f) =>
+        f.id === id ? { ...f, isFavorite: !f.isFavorite } : f
+      ),
+    }));
     try {
       const response = await filesApi.toggleFavorite(id);
       set((state) => ({
@@ -579,7 +620,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         ),
       }));
     } catch (error: any) {
-      set({ error: error.response?.data?.error || "Favorite failed" });
+      set({ files: previousFiles, error: error.response?.data?.error || "Favorite failed" });
     }
   },
 

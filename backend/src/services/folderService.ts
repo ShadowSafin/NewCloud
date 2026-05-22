@@ -1,10 +1,21 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Folder } from "@prisma/client";
 import { storageService } from "./storageService";
 import { NotFoundError, ForbiddenError, ConflictError } from "../utils/errors";
 import { FolderTree } from "../types";
+import { FolderRepository } from "../repositories/FolderRepository";
+import { FileRepository } from "../repositories/FileRepository";
+import { UserRepository } from "../repositories/UserRepository";
 
 export class FolderService {
-  constructor(private prisma: PrismaClient) {}
+  private folderRepository: FolderRepository;
+  private fileRepository: FileRepository;
+  private userRepository: UserRepository;
+
+  constructor(private prisma: PrismaClient) {
+    this.folderRepository = new FolderRepository(prisma);
+    this.fileRepository = new FileRepository(prisma);
+    this.userRepository = new UserRepository(prisma);
+  }
 
   async create(
     userId: string,
@@ -12,9 +23,7 @@ export class FolderService {
     parentId?: string | null
   ): Promise<{ id: string; name: string; parentId: string | null; createdAt: Date }> {
     if (parentId) {
-      const parent = await this.prisma.folder.findUnique({
-        where: { id: parentId },
-      });
+      const parent = await this.folderRepository.findById(parentId);
 
       if (!parent) {
         throw new NotFoundError("Parent folder not found");
@@ -25,24 +34,20 @@ export class FolderService {
       }
     }
 
-    const existing = await this.prisma.folder.findFirst({
-      where: {
-        userId,
-        parentId: parentId || null,
-        name,
-      },
+    const existing = await this.folderRepository.findFirst({
+      userId,
+      parentId: parentId || null,
+      name,
     });
 
     if (existing) {
       throw new ConflictError("A folder with this name already exists here");
     }
 
-    const folder = await this.prisma.folder.create({
-      data: {
-        userId,
-        parentId: parentId || null,
-        name,
-      },
+    const folder = await this.folderRepository.create({
+      userId,
+      parentId: parentId || null,
+      name,
     });
 
     await storageService.ensureUserDirectories(userId);
@@ -67,10 +72,7 @@ export class FolderService {
       where.parentId = null;
     }
 
-    const folders = await this.prisma.folder.findMany({
-      where,
-      orderBy: { name: "asc" },
-    });
+    const folders = await this.folderRepository.findMany(where);
 
     return folders.map((f) => ({
       id: f.id,
@@ -81,10 +83,7 @@ export class FolderService {
   }
 
   async findTree(userId: string): Promise<FolderTree[]> {
-    const folders = await this.prisma.folder.findMany({
-      where: { userId, deletedAt: null },
-      orderBy: { name: "asc" },
-    });
+    const folders = await this.folderRepository.findMany({ userId, deletedAt: null });
 
     const folderMap = new Map<string, FolderTree>();
     const roots: FolderTree[] = [];
@@ -115,9 +114,7 @@ export class FolderService {
     userId: string,
     folderId: string
   ): Promise<{ id: string; name: string }[]> {
-    const folder = await this.prisma.folder.findUnique({
-      where: { id: folderId },
-    });
+    const folder = await this.folderRepository.findById(folderId);
 
     if (!folder || folder.userId !== userId) {
       throw new NotFoundError("Folder not found");
@@ -128,9 +125,7 @@ export class FolderService {
 
     while (current) {
       const currentId: string = current;
-      const f = await this.prisma.folder.findUnique({
-        where: { id: currentId },
-      });
+      const f = await this.folderRepository.findById(currentId);
       if (!f) break;
       breadcrumb.unshift({ id: f.id, name: f.name });
       current = f.parentId;
@@ -144,9 +139,7 @@ export class FolderService {
     id: string,
     name: string
   ): Promise<{ id: string; name: string; parentId: string | null; createdAt: Date }> {
-    const folder = await this.prisma.folder.findUnique({
-      where: { id },
-    });
+    const folder = await this.folderRepository.findById(id);
 
     if (!folder) {
       throw new NotFoundError("Folder not found");
@@ -156,23 +149,18 @@ export class FolderService {
       throw new ForbiddenError("Access denied");
     }
 
-    const duplicate = await this.prisma.folder.findFirst({
-      where: {
-        userId,
-        parentId: folder.parentId,
-        name,
-        NOT: { id },
-      },
+    const duplicate = await this.folderRepository.findFirst({
+      userId,
+      parentId: folder.parentId,
+      name,
+      NOT: { id },
     });
 
     if (duplicate) {
       throw new ConflictError("A folder with this name already exists here");
     }
 
-    const updated = await this.prisma.folder.update({
-      where: { id },
-      data: { name },
-    });
+    const updated = await this.folderRepository.update(id, { name });
 
     return {
       id: updated.id,
@@ -183,13 +171,7 @@ export class FolderService {
   }
 
   async delete(userId: string, id: string): Promise<void> {
-    const folder = await this.prisma.folder.findUnique({
-      where: { id },
-      include: {
-        children: true,
-        files: true,
-      },
-    });
+    const folder = await this.folderRepository.findById(id);
 
     if (!folder) {
       throw new NotFoundError("Folder not found");
@@ -208,16 +190,13 @@ export class FolderService {
     }
 
     await storageService.deleteFolder(userId, folder.id);
-
-    await this.prisma.folder.delete({
-      where: { id },
-    });
+    await this.folderRepository.delete(id);
   }
 
   // === Trash operations (soft delete) ===
 
   async trash(userId: string, folderId: string): Promise<void> {
-    const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
 
@@ -225,10 +204,7 @@ export class FolderService {
 
     // Update user trash size
     if (totalSize > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { trashSize: { increment: totalSize } },
-      });
+      await this.userRepository.updateTrashSize(userId, BigInt(totalSize));
     }
   }
 
@@ -236,21 +212,21 @@ export class FolderService {
     let totalSize = 0;
 
     // Soft-delete all files in this folder
-    const files = await this.prisma.file.findMany({
-      where: { folderId, deletedAt: null },
+    const { files } = await this.fileRepository.findAll({
+      userId,
+      folderId,
+      deletedAt: null,
     });
 
     for (const file of files) {
-      await this.prisma.file.update({
-        where: { id: file.id },
-        data: { deletedAt: new Date() },
-      });
+      await this.fileRepository.update(file.id, { deletedAt: new Date() });
       totalSize += Number(file.size);
     }
 
     // Recursively soft-delete child folders
-    const children = await this.prisma.folder.findMany({
-      where: { parentId: folderId, deletedAt: null },
+    const children = await this.folderRepository.findMany({
+      parentId: folderId,
+      deletedAt: null,
     });
 
     for (const child of children) {
@@ -258,16 +234,13 @@ export class FolderService {
     }
 
     // Soft-delete this folder
-    await this.prisma.folder.update({
-      where: { id: folderId },
-      data: { deletedAt: new Date() },
-    });
+    await this.folderRepository.update(folderId, { deletedAt: new Date() });
 
     return totalSize;
   }
 
   async restore(userId: string, folderId: string): Promise<void> {
-    const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
     if (!folder.deletedAt) return; // Not trashed
@@ -276,10 +249,7 @@ export class FolderService {
 
     // Update user trash size
     if (totalSize > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { trashSize: { decrement: totalSize } },
-      });
+      await this.userRepository.updateTrashSize(userId, -BigInt(totalSize));
     }
   }
 
@@ -287,21 +257,21 @@ export class FolderService {
     let totalSize = 0;
 
     // Restore all files in this folder
-    const files = await this.prisma.file.findMany({
-      where: { folderId, deletedAt: { not: null } },
+    const { files } = await this.fileRepository.findAll({
+      userId,
+      folderId,
+      deletedAt: { not: null } as any,
     });
 
     for (const file of files) {
-      await this.prisma.file.update({
-        where: { id: file.id },
-        data: { deletedAt: null },
-      });
+      await this.fileRepository.update(file.id, { deletedAt: null });
       totalSize += Number(file.size);
     }
 
     // Recursively restore child folders
-    const children = await this.prisma.folder.findMany({
-      where: { parentId: folderId, deletedAt: { not: null } },
+    const children = await this.folderRepository.findMany({
+      parentId: folderId,
+      deletedAt: { not: null } as any,
     });
 
     for (const child of children) {
@@ -309,16 +279,13 @@ export class FolderService {
     }
 
     // Restore this folder
-    await this.prisma.folder.update({
-      where: { id: folderId },
-      data: { deletedAt: null },
-    });
+    await this.folderRepository.update(folderId, { deletedAt: null });
 
     return totalSize;
   }
 
   async permanentDelete(userId: string, folderId: string): Promise<void> {
-    const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
 
@@ -326,13 +293,8 @@ export class FolderService {
 
     // Update storage counters
     if (totalSize > 0) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          storageUsed: { decrement: totalSize },
-          trashSize: { decrement: totalSize },
-        },
-      });
+      await this.userRepository.updateStorageUsed(userId, -BigInt(totalSize));
+      await this.userRepository.updateTrashSize(userId, -BigInt(totalSize));
     }
   }
 
@@ -340,8 +302,8 @@ export class FolderService {
     let totalSize = 0;
 
     // Get child folders
-    const children = await this.prisma.folder.findMany({
-      where: { parentId: folderId },
+    const children = await this.folderRepository.findMany({
+      parentId: folderId,
     });
 
     for (const child of children) {
@@ -349,8 +311,9 @@ export class FolderService {
     }
 
     // Delete all files in this folder
-    const files = await this.prisma.file.findMany({
-      where: { folderId },
+    const { files } = await this.fileRepository.findAll({
+      userId,
+      folderId,
     });
 
     for (const file of files) {
@@ -359,19 +322,19 @@ export class FolderService {
         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       } catch {}
       totalSize += Number(file.size);
-      await this.prisma.file.delete({ where: { id: file.id } });
+      await this.fileRepository.delete(file.id);
     }
 
     // Delete the folder
-    await this.prisma.folder.delete({ where: { id: folderId } });
+    await this.folderRepository.delete(folderId);
 
     return totalSize;
   }
 
   async listTrash(userId: string): Promise<{ id: string; name: string; parentId: string | null; deletedAt: Date }[]> {
-    const folders = await this.prisma.folder.findMany({
-      where: { userId, deletedAt: { not: null } },
-      orderBy: { deletedAt: "desc" },
+    const folders = await this.folderRepository.findMany({
+      userId,
+      deletedAt: { not: null } as any,
     });
 
     return folders.map((f) => ({
@@ -390,9 +353,7 @@ export class FolderService {
     if (!potentialAncestorId) return false;
     if (potentialDescendantId === potentialAncestorId) return true;
 
-    const folder = await this.prisma.folder.findUnique({
-      where: { id: potentialDescendantId },
-    });
+    const folder = await this.folderRepository.findById(potentialDescendantId);
 
     if (!folder || folder.userId !== userId) return false;
     if (!folder.parentId) return false;
@@ -405,12 +366,12 @@ export class FolderService {
     folderId: string,
     targetParentId: string | null
   ): Promise<{ id: string; name: string; parentId: string | null; createdAt: Date }> {
-    const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
 
     if (targetParentId) {
-      const targetParent = await this.prisma.folder.findUnique({ where: { id: targetParentId } });
+      const targetParent = await this.folderRepository.findById(targetParentId);
       if (!targetParent) throw new NotFoundError("Target folder not found");
       if (targetParent.userId !== userId) throw new ForbiddenError("Access denied");
 
@@ -419,13 +380,11 @@ export class FolderService {
       }
     }
 
-    const existing = await this.prisma.folder.findFirst({
-      where: {
-        userId,
-        parentId: targetParentId,
-        name: folder.name,
-        NOT: { id: folderId },
-      },
+    const existing = await this.folderRepository.findFirst({
+      userId,
+      parentId: targetParentId,
+      name: folder.name,
+      NOT: { id: folderId },
     });
 
     if (existing) {
@@ -433,16 +392,15 @@ export class FolderService {
       const nameWithoutExt = folder.name;
       let newName = `${nameWithoutExt} (copy)${ext}`;
       let counter = 1;
-      while (await this.prisma.folder.findFirst({
-        where: { userId, parentId: targetParentId, name: newName },
+      while (await this.folderRepository.findFirst({
+        userId,
+        parentId: targetParentId,
+        name: newName,
       })) {
         counter++;
         newName = `${nameWithoutExt} (copy ${counter})${ext}`;
       }
-      const updated = await this.prisma.folder.update({
-        where: { id: folderId },
-        data: { parentId: targetParentId, name: newName },
-      });
+      const updated = await this.folderRepository.update(folderId, { parentId: targetParentId, name: newName });
       return {
         id: updated.id,
         name: updated.name,
@@ -451,10 +409,7 @@ export class FolderService {
       };
     }
 
-    const updated = await this.prisma.folder.update({
-      where: { id: folderId },
-      data: { parentId: targetParentId },
-    });
+    const updated = await this.folderRepository.update(folderId, { parentId: targetParentId });
 
     return {
       id: updated.id,
@@ -469,50 +424,51 @@ export class FolderService {
     folderId: string,
     targetParentId: string | null
   ): Promise<{ id: string; name: string; parentId: string | null; createdAt: Date }> {
-    const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
 
     let copyName = folder.name;
     let counter = 1;
-    while (await this.prisma.folder.findFirst({
-      where: { userId, parentId: targetParentId, name: copyName },
+    while (await this.folderRepository.findFirst({
+      userId,
+      parentId: targetParentId,
+      name: copyName,
     })) {
       copyName = `${folder.name} (copy ${counter})`;
       counter++;
     }
 
-    const copiedFolder = await this.prisma.folder.create({
-      data: {
-        userId,
-        parentId: targetParentId,
-        name: copyName,
-      },
+    const copiedFolder = await this.folderRepository.create({
+      userId,
+      parentId: targetParentId,
+      name: copyName,
     });
 
-    const childFiles = await this.prisma.file.findMany({
-      where: { folderId, deletedAt: null },
+    const { files: childFiles } = await this.fileRepository.findAll({
+      userId,
+      folderId,
+      deletedAt: null,
     });
 
     for (const file of childFiles) {
-      await this.prisma.file.create({
-        data: {
-          userId,
-          folderId: copiedFolder.id,
-          originalName: file.originalName,
-          storedName: file.storedName,
-          path: file.path,
-          mimeType: file.mimeType,
-          category: file.category,
-          size: file.size,
-          hash: file.hash,
-          refCount: file.refCount,
-        },
+      await this.fileRepository.create({
+        userId,
+        folderId: copiedFolder.id,
+        originalName: file.originalName,
+        storedName: file.storedName,
+        path: file.path,
+        mimeType: file.mimeType,
+        category: file.category,
+        size: file.size,
+        hash: file.hash,
+        refCount: file.refCount,
       });
     }
 
-    const childFolders = await this.prisma.folder.findMany({
-      where: { parentId: folderId, deletedAt: null },
+    const childFolders = await this.folderRepository.findMany({
+      parentId: folderId,
+      deletedAt: null,
     });
 
     for (const child of childFolders) {
@@ -532,40 +488,39 @@ export class FolderService {
     sourceFolderId: string,
     targetParentId: string
   ): Promise<void> {
-    const sourceFolder = await this.prisma.folder.findUnique({ where: { id: sourceFolderId } });
+    const sourceFolder = await this.folderRepository.findById(sourceFolderId);
     if (!sourceFolder) return;
 
-    const newFolder = await this.prisma.folder.create({
-      data: {
-        userId,
-        parentId: targetParentId,
-        name: sourceFolder.name,
-      },
+    const newFolder = await this.folderRepository.create({
+      userId,
+      parentId: targetParentId,
+      name: sourceFolder.name,
     });
 
-    const files = await this.prisma.file.findMany({
-      where: { folderId: sourceFolderId, deletedAt: null },
+    const { files } = await this.fileRepository.findAll({
+      userId,
+      folderId: sourceFolderId,
+      deletedAt: null,
     });
 
     for (const file of files) {
-      await this.prisma.file.create({
-        data: {
-          userId,
-          folderId: newFolder.id,
-          originalName: file.originalName,
-          storedName: file.storedName,
-          path: file.path,
-          mimeType: file.mimeType,
-          category: file.category,
-          size: file.size,
-          hash: file.hash,
-          refCount: file.refCount,
-        },
+      await this.fileRepository.create({
+        userId,
+        folderId: newFolder.id,
+        originalName: file.originalName,
+        storedName: file.storedName,
+        path: file.path,
+        mimeType: file.mimeType,
+        category: file.category,
+        size: file.size,
+        hash: file.hash,
+        refCount: file.refCount,
       });
     }
 
-    const children = await this.prisma.folder.findMany({
-      where: { parentId: sourceFolderId, deletedAt: null },
+    const children = await this.folderRepository.findMany({
+      parentId: sourceFolderId,
+      deletedAt: null,
     });
 
     for (const child of children) {

@@ -13,9 +13,10 @@ model User {
   email         String    @unique
   passwordHash  String    @map("password_hash")
   avatar        String?
-  storageQuota  BigInt    @default(10737418240) @map("storage_quota") // 10GB default
+  storageQuota  BigInt    @default(10737418240) @map("storage_quota")
   storageUsed   BigInt    @default(0) @map("storage_used")
   trashSize     BigInt    @default(0) @map("trash_size")
+  role          String    @default("user")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -24,6 +25,10 @@ model User {
   refreshTokens RefreshToken[]
   shares        Share[]
   uploadSessions UploadSession[]
+  permissions   Permission[]
+  activityLogs  ActivityLog[]
+  eventLogs     EventLog[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -37,6 +42,8 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([token])
   @@map("refresh_tokens")
 }
 
@@ -45,16 +52,21 @@ model Folder {
   userId    String    @map("user_id")
   parentId  String?   @map("parent_id")
   name      String
+  path      String?
   createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   parent Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
   children Folder[] @relation("FolderToFolder")
   files    File[]
+  permissions Permission[]
 
   @@unique([userId, parentId, name])
   @@index([userId, deletedAt])
+  @@index([userId, parentId])
+  @@index([path])
   @@map("folders")
 }
 
@@ -66,6 +78,7 @@ model File {
   storedName   String   @unique @map("stored_name")
   path         String
   mimeType     String   @map("mime_type")
+  extension    String   @default("")
   category     String   @default("unknown")
   thumbnail        String?
   thumbnailSmall   String?  @map("thumbnail_small")
@@ -75,14 +88,19 @@ model File {
   hash             String?
   refCount         Int      @default(1) @map("ref_count")
   isFavorite       Boolean  @default(false) @map("is_favorite")
+  isStarred        Boolean  @default(false) @map("is_starred")
   currentVersion   Int      @default(1) @map("current_version")
+  metadata         Json?
   createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
   deletedAt        DateTime? @map("deleted_at")
 
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   folder   Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
   shares   Share[]
   versions FileVersion[]
+  permissions Permission[]
+  activityLogs ActivityLog[]
 
   @@index([userId, deletedAt])
   @@index([userId, folderId, deletedAt])
@@ -93,22 +111,30 @@ model File {
   @@index([userId, createdAt])
   @@index([userId, size])
   @@index([userId, isFavorite, deletedAt])
+  @@index([userId, isStarred, deletedAt])
+  @@index([userId, extension])
+  @@index([userId, mimeType])
+  @@index([category, size])
+  @@index([hash, refCount])
   @@map("files")
 }
 
 model FileVersion {
-  id        String   @id @default(uuid())
-  fileId    String   @map("file_id")
-  version   Int
-  storedName String  @unique @map("stored_name")
-  path      String
-  size      BigInt
-  hash      String?
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  fileId     String   @map("file_id")
+  version    Int
+  storedName String   @unique @map("stored_name")
+  path       String
+  size       BigInt
+  hash       String?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
 
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   @@unique([fileId, version])
+  @@index([fileId, version])
+  @@index([fileId, createdAt])
   @@map("file_versions")
 }
 
@@ -120,11 +146,18 @@ model Share {
   passwordHash String?   @map("password_hash")
   expiresAt    DateTime? @map("expires_at")
   views        Int       @default(0)
+  maxViews     Int?      @map("max_views")
+  allowDownload Boolean  @default(true) @map("allow_download")
   createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   file  File  @relation(fields: [fileId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([token])
+  @@index([userId])
+  @@index([fileId])
+  @@index([expiresAt])
   @@map("shares")
 }
 
@@ -134,12 +167,14 @@ model UploadSession {
   filename     String
   mimeType     String   @map("mime_type")
   totalSize    BigInt   @map("total_size")
-  chunkSize    Int      @default(5242880) @map("chunk_size") // 5MB default
+  chunkSize    Int      @default(5242880) @map("chunk_size")
   totalChunks  Int      @map("total_chunks")
   uploadedChunks Int    @default(0) @map("uploaded_chunks")
   folderId     String?  @map("folder_id")
-  status       String   @default("pending") // pending, uploading, merging, completed, failed, cancelled
+  status       String   @default("pending")
   hash         String?
+  fileId       String?  @map("file_id")
+  progress     Float    @default(0)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   completedAt  DateTime? @map("completed_at")
@@ -148,6 +183,8 @@ model UploadSession {
   chunks UploadChunk[]
 
   @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
   @@map("upload_sessions")
 }
 
@@ -164,5 +201,102 @@ model UploadChunk {
   session UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, chunkIndex])
+  @@index([sessionId, uploaded])
   @@map("upload_chunks")
+}
+
+model Permission {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  fileId     String?  @map("file_id")
+  folderId   String?  @map("folder_id")
+  role       String   @default("viewer")
+  inherited  Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file   File?   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  folder Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fileId])
+  @@unique([userId, folderId])
+  @@index([userId])
+  @@index([fileId])
+  @@index([folderId])
+  @@index([userId, role])
+  @@map("permissions")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  fileId    String?  @map("file_id")
+  folderId  String?  @map("folder_id")
+  action    String
+  details   Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file   File? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, action])
+  @@index([fileId])
+  @@index([folderId])
+  @@index([action, createdAt])
+  @@map("activity_logs")
+}
+
+model EventLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  eventType String   @map("event_type")
+  payload   Json
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([eventType, processed])
+  @@index([userId, createdAt])
+  @@index([processed, createdAt])
+  @@map("event_logs")
+}
+
+model SyncPreparation {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  deviceId    String   @map("device_id")
+  lastSyncAt  DateTime @map("last_sync_at")
+  cursor      String?
+  status      String   @default("idle")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, deviceId])
+  @@index([userId, lastSyncAt])
+  @@index([status])
+  @@map("sync_preparations")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  message   String
+  data      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("notifications")
 }

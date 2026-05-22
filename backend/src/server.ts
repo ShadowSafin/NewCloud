@@ -1,3 +1,4 @@
+import "./lib/bigintPatch";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -23,6 +24,15 @@ import versionRoutes from "./routes/versionRoutes";
 import { FileService } from "./services/fileService";
 
 const app = express();
+
+// Custom Express JSON replacer to serialize BigInts safely
+app.set("json replacer", (key: string, value: any) => {
+  if (typeof value === "bigint") {
+    const num = Number(value);
+    return Number.isSafeInteger(num) ? num : value.toString();
+  }
+  return value;
+});
 
 // Async error wrapper - catches errors from async route handlers
 const asyncHandler = (fn: any) => (req: any, res: any, next: any) => {
@@ -83,7 +93,21 @@ app.use(requestLogger);
 
 // Health check
 app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "ok", 
+    name: "NewCloud", 
+    version: "1.0.0",
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// API health check for server discovery
+app.get("/api/health", (_req: Request, res: Response) => {
+  res.json({ 
+    status: "ok", 
+    name: "NewCloud", 
+    version: "1.0.0" 
+  });
 });
 
 // Bull Board - Queue monitoring dashboard
