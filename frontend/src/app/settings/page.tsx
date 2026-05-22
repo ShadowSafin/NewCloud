@@ -238,10 +238,8 @@ export default function SettingsPage() {
                         >
                           <div className="flex flex-col gap-1">
                             <span className="text-[10px] text-body-mid font-mono">
-                              {url.includes("newcloud.local")
+                              {url.includes(".local")
                                 ? "mDNS Hostname"
-                                : url.includes(".local")
-                                ? "System Hostname"
                                 : `IP Address (Adapter ${idx})`}
                             </span>
                             <span className="text-xs text-ink font-mono select-all font-semibold">

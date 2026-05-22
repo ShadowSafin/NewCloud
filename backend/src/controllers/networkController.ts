@@ -46,17 +46,12 @@ export class NetworkController {
         `http://${machineHostname}:${frontendPort}`
       ];
 
-      // fallback / secondary mDNS configurations
-      if (machineHostname !== "newcloud.local") {
-        urls.push(`http://newcloud.local:${frontendPort}`);
-      }
-
       res.json({
         success: true,
         data: {
           ips,
           primaryIp,
-          hostname: "newcloud.local",
+          hostname: machineHostname,
           machineHostname,
           port: backendPort,
           frontendPort,
