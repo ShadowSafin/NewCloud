@@ -7,6 +7,14 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
+  if (err.message === "Not allowed by CORS") {
+    res.status(403).json({
+      success: false,
+      error: "CORS blocking: Origin not allowed",
+    });
+    return;
+  }
+
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       success: false,

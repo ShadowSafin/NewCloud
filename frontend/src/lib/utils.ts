@@ -6,8 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 const API_URL = typeof window !== "undefined"
-  ? (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000")
-  : "";
+  ? `${window.location.protocol}//${window.location.hostname}:4000`
+  : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000");
 
 /**
  * Build a full backend URL with auth token for <img>, <video>, <audio>, <iframe> tags.

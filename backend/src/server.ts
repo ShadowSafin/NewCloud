@@ -22,6 +22,9 @@ import shareRoutes from "./routes/shareRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
 import versionRoutes from "./routes/versionRoutes";
 import { FileService } from "./services/fileService";
+import { wsServer } from "./websocket";
+import { mdnsService } from "./services/mdnsService";
+import networkRoutes from "./routes/networkRoutes";
 
 const app = express();
 
@@ -45,10 +48,63 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }));
 
-// CORS
+// Dynamic CORS origin checker
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return true;
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]"
+    ) {
+      return true;
+    }
+
+    if (
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".home") ||
+      hostname.endsWith(".lan")
+    ) {
+      return true;
+    }
+
+    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+      return true;
+    }
+    if (hostname.startsWith("172.")) {
+      const parts = hostname.split(".");
+      if (parts.length === 4) {
+        const secondOctet = parseInt(parts[1], 10);
+        if (secondOctet >= 16 && secondOctet <= 31) {
+          return true;
+        }
+      }
+    }
+
+    if (config.frontendUrl) {
+      const configuredUrl = new URL(config.frontendUrl);
+      if (hostname === configuredUrl.hostname) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+};
+
 app.use(
   cors({
-    origin: config.frontendUrl,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
@@ -156,6 +212,7 @@ app.use("/api/folders", folderRoutes);
 app.use("/api/shares", shareRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/versions", versionRoutes);
+app.use("/api/network", networkRoutes);
 
 // Error handling
 app.use(errorHandler);
@@ -181,12 +238,16 @@ app.use((_req: Request, res: Response) => {
 })();
 
 // Graceful shutdown
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, "0.0.0.0", () => {
   console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
+  wsServer.initialize(server);
+  mdnsService.start();
 });
 
 const gracefulShutdown = async (signal: string) => {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
+  mdnsService.stop();
+  wsServer.disconnect();
   server.close(async () => {
     await prisma.$disconnect();
     console.log("Server closed and database disconnected");

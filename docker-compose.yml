@@ -58,6 +58,8 @@ services:
       MAX_UPLOADS_PER_MINUTE: ${MAX_UPLOADS_PER_MINUTE:-30}
       BULL_BOARD_USERNAME: ${BULL_BOARD_USERNAME:-admin}
       BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:-changeme}
+      HOST_LAN_IP: ${HOST_LAN_IP}
+      HOST_HOSTNAME: ${HOST_HOSTNAME}
     volumes:
       - ./data:/app/data
     ports:
@@ -68,7 +70,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
