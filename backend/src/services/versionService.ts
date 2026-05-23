@@ -1,9 +1,11 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { pipeline } from "stream/promises";
 import { storageService } from "./storageService";
+import { storageBlobService } from "./storageBlobService";
+import { storageAccountingService } from "./storageAccountingService";
 import { versionCleanupQueue } from "../lib/queues";
 import { NotFoundError, ForbiddenError } from "../utils/errors";
 import { VersionRepository } from "../repositories/VersionRepository";
@@ -18,12 +20,18 @@ export class VersionService {
     this.fileRepository = new FileRepository(prisma);
   }
 
-  async createVersion(userId: string, fileId: string): Promise<any> {
-    const file = await this.fileRepository.findById(fileId);
+  async createVersion(userId: string, fileId: string, tx?: Prisma.TransactionClient): Promise<any> {
+    const client = tx || this.prisma;
+    const file = tx
+      ? await client.file.findUnique({ where: { id: fileId } })
+      : await this.fileRepository.findById(fileId);
     if (!file) throw new NotFoundError("File not found");
     if (file.userId !== userId) throw new ForbiddenError("Access denied");
 
-    const latestVersion = await this.versionRepository.findLatest(fileId);
+    const latestVersion = await client.fileVersion.findFirst({
+      where: { fileId },
+      orderBy: { version: "desc" },
+    });
     const newVersion = (latestVersion?.version || 0) + 1;
 
     // Version storage directory
@@ -35,14 +43,33 @@ export class VersionService {
     const versionPath = path.join(versionDir, versionStoredName);
 
     // Enforce path traversal defense
-    if (!storageService.isSafePath(userId, file.path)) {
+    if (!storageService.isSafePathGlobal(file.path)) {
       throw new ForbiddenError("Access denied: Invalid source path");
     }
     if (!storageService.isSafePath(userId, versionPath)) {
       throw new ForbiddenError("Access denied: Invalid destination path");
     }
 
-    // Stream-based copy for large files (memory efficient)
+    if (file.blobId) {
+      const blob = await storageBlobService.addReference(file.blobId, tx);
+      const version = await client.fileVersion.create({
+        data: {
+          fileId,
+          blobId: blob.id,
+          version: newVersion,
+          storedName: versionStoredName,
+          path: blob.physicalPath,
+          size: file.size,
+          hash: file.hash,
+        },
+      });
+
+      await client.file.update({ where: { id: fileId }, data: { currentVersion: newVersion } });
+      await versionCleanupQueue.add("cleanup", { fileId }).catch(() => {});
+      return version;
+    }
+
+    // Legacy records without blob_id still get a physical version copy.
     if (fs.existsSync(file.path)) {
       await pipeline(
         fs.createReadStream(file.path),
@@ -62,17 +89,19 @@ export class VersionService {
       });
     }
 
-    const version = await this.versionRepository.create({
-      fileId,
-      version: newVersion,
-      storedName: versionStoredName,
-      path: versionPath,
-      size: file.size,
-      hash,
+    const version = await client.fileVersion.create({
+      data: {
+        fileId,
+        version: newVersion,
+        storedName: versionStoredName,
+        path: versionPath,
+        size: file.size,
+        hash,
+      },
     });
 
     // Update file's current version
-    await this.fileRepository.update(fileId, { currentVersion: newVersion });
+    await client.file.update({ where: { id: fileId }, data: { currentVersion: newVersion } });
 
     // Enqueue version cleanup
     await versionCleanupQueue.add("cleanup", { fileId }).catch(() => {});
@@ -97,30 +126,49 @@ export class VersionService {
     if (!version) throw new NotFoundError("Version not found");
 
     // Enforce path traversal defense
-    if (!storageService.isSafePath(userId, version.path)) {
+    if (!storageService.isSafePathGlobal(version.path)) {
       throw new ForbiddenError("Access denied: Invalid version path");
     }
-    if (!storageService.isSafePath(userId, file.path)) {
+    if (!storageService.isSafePathGlobal(file.path)) {
       throw new ForbiddenError("Access denied: Invalid destination path");
     }
 
-    // Save current version before restoring
-    await this.createVersion(userId, fileId);
-
-    // Restore the version file to the original path
-    if (fs.existsSync(version.path)) {
-      await pipeline(
-        fs.createReadStream(version.path),
-        fs.createWriteStream(file.path)
-      );
-    }
-
-    // Update file size and hash
-    await this.fileRepository.update(fileId, {
-      size: version.size,
-      hash: version.hash,
-      currentVersion: versionNumber,
+    let blobCleanupPath: string | null = null;
+    await this.prisma.$transaction(async (tx) => {
+      await this.createVersion(userId, fileId, tx);
+      if (version.blobId) {
+        const blob = await storageBlobService.addReference(version.blobId, tx);
+        blobCleanupPath = await storageBlobService.releaseReference(file.blobId, tx);
+        await tx.file.update({
+          where: { id: fileId },
+          data: {
+            blobId: blob.id,
+            path: blob.physicalPath,
+            size: version.size,
+            hash: version.hash,
+            currentVersion: versionNumber,
+          },
+        });
+      } else {
+        if (fs.existsSync(version.path)) {
+          await pipeline(
+            fs.createReadStream(version.path),
+            fs.createWriteStream(file.path)
+          );
+        }
+        await tx.file.update({
+          where: { id: fileId },
+          data: {
+            size: version.size,
+            hash: version.hash,
+            currentVersion: versionNumber,
+          },
+        });
+      }
+      await storageAccountingService.recalculateUserUsage(userId, tx);
     });
+
+    await storageBlobService.deletePhysicalBlob(blobCleanupPath);
 
     return { restored: versionNumber, fileId };
   }
@@ -134,16 +182,23 @@ export class VersionService {
     if (!version) throw new NotFoundError("Version not found");
 
     // Enforce path traversal defense
-    if (!storageService.isSafePath(userId, version.path)) {
+    if (!storageService.isSafePathGlobal(version.path)) {
       throw new ForbiddenError("Access denied: Invalid version path");
     }
 
-    // Delete physical file
-    try {
-      if (fs.existsSync(version.path)) fs.unlinkSync(version.path);
-    } catch {}
+    let blobCleanupPath: string | null = null;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.fileVersion.delete({ where: { id: version.id } });
+      blobCleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+    });
 
-    await this.versionRepository.delete(version.id);
+    if (version.blobId) {
+      await storageBlobService.deletePhysicalBlob(blobCleanupPath);
+    } else {
+      try {
+        if (fs.existsSync(version.path)) fs.unlinkSync(version.path);
+      } catch {}
+    }
 
     return { deleted: versionNumber, fileId };
   }

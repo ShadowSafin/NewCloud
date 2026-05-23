@@ -64,7 +64,6 @@ export function FolderCard({
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    console.log("FolderCard click", folder.id, e.detail);
     if (e.detail > 1) return;
     
     e.stopPropagation();

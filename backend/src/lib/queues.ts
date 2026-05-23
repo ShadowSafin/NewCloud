@@ -69,6 +69,51 @@ export const storageCalcQueue = new Queue("storage-calc", {
   },
 });
 
+export const storageIntegrityQueue = new Queue("storage-integrity", {
+  connection: createRedisConnection(),
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 2000 },
+    ...defaultOpts,
+  },
+});
+
+export const orphanBlobCleanupQueue = new Queue("orphan-blob-cleanup", {
+  connection: createRedisConnection(),
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 2000 },
+    ...defaultOpts,
+  },
+});
+
+export const referenceVerificationQueue = new Queue("reference-verification", {
+  connection: createRedisConnection(),
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 2000 },
+    ...defaultOpts,
+  },
+});
+
+export const chunkCleanupQueue = new Queue("chunk-cleanup", {
+  connection: createRedisConnection(),
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 2000 },
+    ...defaultOpts,
+  },
+});
+
+export const metadataRepairQueue = new Queue("metadata-repair", {
+  connection: createRedisConnection(),
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 2000 },
+    ...defaultOpts,
+  },
+});
+
 export const allQueues = [
   thumbnailQueue,
   chunkMergeQueue,
@@ -77,4 +122,9 @@ export const allQueues = [
   dedupProcessorQueue,
   versionCleanupQueue,
   storageCalcQueue,
+  storageIntegrityQueue,
+  orphanBlobCleanupQueue,
+  referenceVerificationQueue,
+  chunkCleanupQueue,
+  metadataRepairQueue,
 ];

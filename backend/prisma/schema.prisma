@@ -33,6 +33,23 @@ model User {
   @@map("users")
 }
 
+model StorageBlob {
+  id             String   @id @default(uuid())
+  hash           String   @unique
+  physicalPath   String   @unique @map("physical_path")
+  size           BigInt
+  referenceCount Int      @default(0) @map("reference_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  files    File[]
+  versions FileVersion[]
+
+  @@index([hash])
+  @@index([referenceCount])
+  @@map("storage_blobs")
+}
+
 model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique
@@ -74,6 +91,7 @@ model File {
   id           String   @id @default(uuid())
   userId       String   @map("user_id")
   folderId     String?  @map("folder_id")
+  blobId       String?  @map("blob_id")
   originalName String   @map("original_name")
   storedName   String   @unique @map("stored_name")
   path         String
@@ -97,6 +115,7 @@ model File {
 
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   folder   Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  blob     StorageBlob?  @relation(fields: [blobId], references: [id], onDelete: Restrict)
   shares   Share[]
   versions FileVersion[]
   permissions Permission[]
@@ -104,6 +123,7 @@ model File {
 
   @@index([userId, deletedAt])
   @@index([userId, folderId, deletedAt])
+  @@index([blobId])
   @@index([hash])
   @@index([userId, hash])
   @@index([userId, originalName])
@@ -122,6 +142,7 @@ model File {
 model FileVersion {
   id         String   @id @default(uuid())
   fileId     String   @map("file_id")
+  blobId     String?  @map("blob_id")
   version    Int
   storedName String   @unique @map("stored_name")
   path       String
@@ -131,9 +152,11 @@ model FileVersion {
   createdAt  DateTime @default(now()) @map("created_at")
 
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  blob StorageBlob? @relation(fields: [blobId], references: [id], onDelete: Restrict)
 
   @@unique([fileId, version])
   @@index([fileId, version])
+  @@index([blobId])
   @@index([fileId, createdAt])
   @@map("file_versions")
 }

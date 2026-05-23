@@ -11,15 +11,13 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Accept token from Authorization header OR query parameter
-    // (query param needed for <img>, <video>, <audio>, <iframe> tags which can't set headers)
+    // Accept access tokens only from Authorization headers.
+    // Media tags use short-lived signed URLs instead of leaking JWTs in query strings.
     const authHeader = req.headers.authorization;
     let token: string | undefined;
 
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7);
-    } else if (req.query.token) {
-      token = req.query.token as string;
     }
 
     if (!token) {

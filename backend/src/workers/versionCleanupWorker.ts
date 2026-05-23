@@ -3,6 +3,7 @@ import fs from "fs";
 import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
 import { config } from "../config";
+import { storageBlobService } from "../services/storageBlobService";
 
 interface VersionCleanupJobData {
   fileId: string;
@@ -31,11 +32,18 @@ export function createVersionCleanupWorker(): Worker {
       let deletedCount = 0;
 
       for (const version of toDelete) {
-        try {
-          if (fs.existsSync(version.path)) fs.unlinkSync(version.path);
-        } catch {}
-
-        await prisma.fileVersion.delete({ where: { id: version.id } });
+        let cleanupPath: string | null = null;
+        await prisma.$transaction(async (tx) => {
+          await tx.fileVersion.delete({ where: { id: version.id } });
+          cleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+        });
+        if (version.blobId) {
+          await storageBlobService.deletePhysicalBlob(cleanupPath);
+        } else {
+          try {
+            if (fs.existsSync(version.path)) fs.unlinkSync(version.path);
+          } catch {}
+        }
         deletedCount++;
       }
 

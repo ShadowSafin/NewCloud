@@ -1,7 +1,6 @@
 import { Response, NextFunction } from "express";
 import { AuthenticatedRequest } from "../types";
 import { getCacheClient } from "../lib/redis";
-import { config } from "../config";
 
 /**
  * Per-user rate limiting using Redis.

@@ -43,12 +43,16 @@ services:
       PORT: ${BACKEND_PORT:-4000}
       DATABASE_URL: postgresql://${DB_USER:-clouduser}:${DB_PASSWORD:-cloudpass}@postgres:5432/${DB_NAME:-cloudstorage}?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key-change-in-production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?MEDIA_TOKEN_SECRET is required}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
       STORAGE_ROOT: /app/data/storage
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-1099511627776}
+      UPLOAD_CHUNK_SIZE: ${UPLOAD_CHUNK_SIZE:-16777216}
+      MAX_UPLOAD_CHUNK_SIZE: ${MAX_UPLOAD_CHUNK_SIZE:-268435456}
+      BLOCK_DANGEROUS_UPLOADS: ${BLOCK_DANGEROUS_UPLOADS:-false}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
       MAX_VERSIONS_PER_FILE: ${MAX_VERSIONS_PER_FILE:-10}
@@ -57,7 +61,7 @@ services:
       MAX_FILES_PER_USER: ${MAX_FILES_PER_USER:-100000}
       MAX_UPLOADS_PER_MINUTE: ${MAX_UPLOADS_PER_MINUTE:-30}
       BULL_BOARD_USERNAME: ${BULL_BOARD_USERNAME:-admin}
-      BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:-changeme}
+      BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:?BULL_BOARD_PASSWORD is required}
       HOST_LAN_IP: ${HOST_LAN_IP}
       HOST_HOSTNAME: ${HOST_HOSTNAME}
     volumes:
@@ -74,16 +78,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: sh -c "npx prisma db push --accept-data-loss && npm run dev"
+    command: sh -c "npx prisma migrate deploy && npm start"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ""
+        INTERNAL_API_URL: http://cloud-backend:4000
     container_name: cloud-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      NEXT_PUBLIC_API_URL: ""
       INTERNAL_API_URL: http://cloud-backend:4000
     ports:
       - "3000:3000"
@@ -101,7 +108,14 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: postgresql://${DB_USER:-clouduser}:${DB_PASSWORD:-cloudpass}@postgres:5432/${DB_NAME:-cloudstorage}?schema=public
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?MEDIA_TOKEN_SECRET is required}
       STORAGE_ROOT: /app/data/storage
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-1099511627776}
+      UPLOAD_CHUNK_SIZE: ${UPLOAD_CHUNK_SIZE:-16777216}
+      MAX_UPLOAD_CHUNK_SIZE: ${MAX_UPLOAD_CHUNK_SIZE:-268435456}
+      BLOCK_DANGEROUS_UPLOADS: ${BLOCK_DANGEROUS_UPLOADS:-false}
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
       MAX_VERSIONS_PER_FILE: ${MAX_VERSIONS_PER_FILE:-10}
     volumes:
@@ -116,7 +130,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    command: npm run worker
+    command: node dist/worker.js
 
 volumes:
   postgres_data:

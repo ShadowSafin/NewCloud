@@ -2,13 +2,16 @@ import { Worker, Job } from "bullmq";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { File } from "@prisma/client";
 import { createRedisConnection } from "../lib/redis";
 import { thumbnailQueue } from "../lib/queues";
 import { prisma } from "../db";
 import { storageService } from "../services/storageService";
 import { fileTypeService } from "../services/fileTypeService";
-import { dedupService } from "../services/dedupService";
 import { VersionService } from "../services/versionService";
+import { storageBlobService } from "../services/storageBlobService";
+import { storageAccountingService } from "../services/storageAccountingService";
+import { config } from "../config";
 
 interface ChunkMergeJobData {
   sessionId: string;
@@ -36,7 +39,7 @@ export function createChunkMergeWorker(): Worker {
       // Merge chunks into final file using streams
       const ext = path.extname(session.filename);
       const storedName = `${sessionId}${ext}`;
-      const filePath = path.join(storageService.getUserFilesPath(userId), storedName);
+      const filePath = path.join(storageService.getUserUploadsPath(userId), `${sessionId}_merged`);
 
       const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -71,6 +74,11 @@ export function createChunkMergeWorker(): Worker {
         writeStream.on("error", reject);
       });
 
+      if (config.blockDangerousUploads && fileTypeService.isDangerous(session.mimeType, ext)) {
+        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+        throw new Error(`File type ${ext || session.mimeType} is not allowed for security reasons`);
+      }
+
       // Dynamic Binary Signature Validation (Magic-Number validation)
       const isSignatureValid = await fileTypeService.validateSignature(filePath, session.mimeType);
       if (!isSignatureValid) {
@@ -82,27 +90,7 @@ export function createChunkMergeWorker(): Worker {
 
       const fileHash = hash.digest("hex");
       const versionService = new VersionService(prisma);
-
-      // Check for deduplication
-      const existingFile = await prisma.file.findFirst({
-        where: { hash: fileHash, userId, deletedAt: null },
-      });
-
-      let finalPath = filePath;
-      let finalStoredName = storedName;
-
-      if (existingFile) {
-        finalPath = existingFile.path;
-        finalStoredName = existingFile.storedName;
-        try { fs.unlinkSync(filePath); } catch {}
-
-        // Increment refCount on ALL files sharing this physical path
-        const newRefCount = existingFile.refCount + 1;
-        await prisma.file.updateMany({
-          where: { path: existingFile.path },
-          data: { refCount: newRefCount },
-        });
-      }
+      const blob = await storageBlobService.ingestFile(filePath, BigInt(Number(session.totalSize)), fileHash);
 
       // Check for duplicate filename in the same folder
       const existingFileWithName = await prisma.file.findFirst({
@@ -115,71 +103,76 @@ export function createChunkMergeWorker(): Worker {
       });
 
       const fileInfo = fileTypeService.getFileInfo(session.filename, session.mimeType);
-      let file;
+      let file: File | null = null;
+      let mergedFileId = "";
+      let blobCleanupPath: string | null = null;
 
-      if (existingFileWithName) {
-        // 1. Create a version backup of the existing file
-        await versionService.createVersion(userId, existingFileWithName.id);
+      try {
+        await prisma.$transaction(async (tx) => {
+          if (existingFileWithName) {
+            await versionService.createVersion(userId, existingFileWithName.id, tx);
+            blobCleanupPath = await storageBlobService.releaseReference(existingFileWithName.blobId, tx);
 
-        // 2. Safely release/delete the previous physical file
-        await dedupService.releaseFile(existingFileWithName);
+            file = await tx.file.update({
+              where: { id: existingFileWithName.id },
+              data: {
+                blobId: blob.id,
+                storedName,
+                path: blob.physicalPath,
+                mimeType: session.mimeType,
+                extension: fileInfo.extension,
+                category: fileInfo.category,
+                size: BigInt(Number(session.totalSize)),
+                hash: fileHash,
+                refCount: blob.referenceCount,
+                thumbnail: null,
+                thumbnailSmall: null,
+                thumbnailMedium: null,
+                thumbnailLarge: null,
+              },
+            });
+          } else {
+            file = await tx.file.create({
+              data: {
+                userId,
+                folderId: session.folderId,
+                blobId: blob.id,
+                originalName: session.filename,
+                storedName,
+                path: blob.physicalPath,
+                mimeType: session.mimeType,
+                extension: fileInfo.extension,
+                category: fileInfo.category,
+                size: BigInt(Number(session.totalSize)),
+                hash: fileHash,
+                refCount: blob.referenceCount,
+              },
+            });
+          }
 
-        // 3. Update the existing file record with the new properties
-        file = await prisma.file.update({
-          where: { id: existingFileWithName.id },
-          data: {
-            storedName: finalStoredName,
-            path: finalPath,
-            mimeType: session.mimeType,
-            category: fileInfo.category,
-            size: BigInt(Number(session.totalSize)),
-            hash: fileHash,
-            refCount: existingFile ? existingFile.refCount + 1 : 1,
-            thumbnail: null,
-            thumbnailSmall: null,
-            thumbnailMedium: null,
-            thumbnailLarge: null,
-          },
+          if (!file) {
+            throw new Error("Chunk merge completed without creating or updating a file record");
+          }
+          mergedFileId = file.id;
+
+          await tx.uploadSession.update({
+            where: { id: sessionId },
+            data: { status: "completed", completedAt: new Date(), hash: fileHash, fileId: mergedFileId },
+          });
+
+          await storageAccountingService.recalculateUserUsage(userId, tx);
         });
-
-        // Update user storage net change
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            storageUsed: {
-              increment: Number(session.totalSize) - Number(existingFileWithName.size),
-            },
-          },
-        });
-      } else {
-        // No duplicate filename exists - create new file record
-        file = await prisma.file.create({
-          data: {
-            userId,
-            folderId: session.folderId,
-            originalName: session.filename,
-            storedName: finalStoredName,
-            path: finalPath,
-            mimeType: session.mimeType,
-            category: fileInfo.category,
-            size: BigInt(Number(session.totalSize)),
-            hash: fileHash,
-            refCount: existingFile ? existingFile.refCount + 1 : 1,
-          },
-        });
-
-        // Update user storage
-        await prisma.user.update({
-          where: { id: userId },
-          data: { storageUsed: { increment: Number(session.totalSize) } },
-        });
+      } catch (error) {
+        const cleanup = await storageBlobService.releaseReference(blob.id).catch(() => null);
+        await storageBlobService.deletePhysicalBlob(cleanup);
+        throw error;
+      } finally {
+        await storageBlobService.deletePhysicalBlob(blobCleanupPath);
       }
 
-      // Mark session completed
-      await prisma.uploadSession.update({
-        where: { id: sessionId },
-        data: { status: "completed", completedAt: new Date(), hash: fileHash, fileId: file.id },
-      });
+      if (!mergedFileId) {
+        throw new Error("Chunk merge completed without a file record");
+      }
 
       // Clean up chunk files
       for (const chunk of session.chunks) {
@@ -188,13 +181,13 @@ export function createChunkMergeWorker(): Worker {
 
       // Enqueue thumbnail generation
       if (fileInfo.canThumbnail) {
-        await thumbnailQueue.add("generate", { fileId: file.id }).catch((err) => {
+        await thumbnailQueue.add("generate", { fileId: mergedFileId }).catch((err) => {
           console.error("Failed to enqueue thumbnail job:", err.message);
         });
       }
 
-      console.log(`Session ${sessionId} merged successfully. File: ${file.id}`);
-      return { fileId: file.id, hash: fileHash };
+      console.log(`Session ${sessionId} merged successfully. File: ${mergedFileId}`);
+      return { fileId: mergedFileId, hash: fileHash };
     },
     {
       connection: createRedisConnection(),

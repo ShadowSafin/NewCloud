@@ -1,7 +1,10 @@
 import { Worker, Job } from "bullmq";
 import fs from "fs";
+import path from "path";
 import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
+import { storageBlobService } from "../services/storageBlobService";
+import { storageService } from "../services/storageService";
 
 interface DedupJobData {
   fileId: string;
@@ -19,53 +22,40 @@ export function createDedupProcessorWorker(): Worker {
       if (!file) throw new Error(`File ${fileId} not found`);
       if (!hash) return { deduplicated: false, reason: "no hash" };
 
-      // Find other files with same hash for same user (not deleted, not this file)
-      const duplicates = await prisma.file.findMany({
-        where: {
-          hash,
-          userId: file.userId,
-          deletedAt: null,
-          id: { not: fileId },
-          refCount: { gt: 0 },
-        },
-        orderBy: { createdAt: "asc" },
-      });
-
-      if (duplicates.length === 0) {
-        return { deduplicated: false, reason: "no duplicates" };
+      if (file.blobId) {
+        return { deduplicated: false, reason: "already blob-backed" };
       }
 
-      // Found duplicate - reuse the oldest file's physical storage
-      const original = duplicates[0];
-
-      // Verify the original's physical file exists
-      if (!fs.existsSync(original.path)) {
-        console.log(`Original file ${original.id} physical file missing, skipping dedup`);
-        return { deduplicated: false, reason: "original missing" };
+      if (!fs.existsSync(file.path)) {
+        return { deduplicated: false, reason: "file missing" };
       }
 
-      // Delete the duplicate's physical file
-      if (file.path !== original.path && fs.existsSync(file.path)) {
-        try { fs.unlinkSync(file.path); } catch {}
+      await fs.promises.mkdir(storageService.getTempPath(), { recursive: true });
+      const tempCopyPath = path.join(storageService.getTempPath(), `${file.id}-${Date.now()}`);
+      await fs.promises.copyFile(file.path, tempCopyPath);
+
+      const blob = await storageBlobService.ingestFile(tempCopyPath, file.size, hash);
+      try {
+        await prisma.file.update({
+          where: { id: fileId },
+          data: {
+            blobId: blob.id,
+            path: blob.physicalPath,
+            refCount: blob.referenceCount,
+          },
+        });
+      } catch (error) {
+        const cleanupPath = await storageBlobService.releaseReference(blob.id).catch(() => null);
+        await storageBlobService.deletePhysicalBlob(cleanupPath);
+        throw error;
       }
 
-      // Update the duplicate to point to original's physical file
-      await prisma.file.update({
-        where: { id: fileId },
-        data: {
-          storedName: original.storedName,
-          path: original.path,
-        },
-      });
+      if (storageService.isSafePathGlobal(file.path)) {
+        await fs.promises.unlink(file.path).catch(() => {});
+      }
 
-      // Increment refCount on the original
-      await prisma.file.update({
-        where: { id: original.id },
-        data: { refCount: { increment: 1 } },
-      });
-
-      console.log(`File ${fileId} deduplicated to original ${original.id}`);
-      return { deduplicated: true, originalId: original.id };
+      console.log(`File ${fileId} attached to blob ${blob.id}`);
+      return { deduplicated: true, blobId: blob.id };
     },
     {
       connection: createRedisConnection(),

@@ -12,6 +12,7 @@ import {
 import { filesApi } from "../lib/api";
 
 const STORAGE_KEY = "cloudstore-uploads";
+const DEFAULT_UPLOAD_CHUNK_SIZE = 16 * 1024 * 1024;
 
 // Shared task map
 const taskMap = new Map<string, UploadTask>();
@@ -95,8 +96,8 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
         sessionId: "",
         filename: file.name,
         totalSize: file.size,
-        chunkSize: 5 * 1024 * 1024,
-        totalChunks: Math.ceil(file.size / (5 * 1024 * 1024)),
+        chunkSize: DEFAULT_UPLOAD_CHUNK_SIZE,
+        totalChunks: Math.ceil(file.size / DEFAULT_UPLOAD_CHUNK_SIZE),
         uploadedChunks: new Set(),
         failedChunks: new Map(),
         status: "uploading",

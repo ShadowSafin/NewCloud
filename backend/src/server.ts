@@ -12,8 +12,12 @@ import { prisma } from "./db";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler } from "./middleware/errorHandler";
 import { storageService } from "./services/storageService";
+import {
+  metadataRepairQueue,
+  referenceVerificationQueue,
+  storageIntegrityQueue,
+} from "./lib/queues";
 import { allQueues } from "./lib/queues";
-import { rateLimitPerUser } from "./middleware/rateLimitPerUser";
 import { authenticate } from "./middleware/auth";
 import authRoutes from "./routes/authRoutes";
 import fileRoutes from "./routes/fileRoutes";
@@ -21,6 +25,7 @@ import folderRoutes from "./routes/folderRoutes";
 import shareRoutes from "./routes/shareRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
 import versionRoutes from "./routes/versionRoutes";
+import mediaRoutes from "./routes/mediaRoutes";
 import { FileService } from "./services/fileService";
 import { wsServer } from "./websocket";
 import { mdnsService } from "./services/mdnsService";
@@ -141,8 +146,8 @@ const shareLimiter = rateLimit({
 app.use("/api/shares/public", shareLimiter);
 
 // Body parsing
-app.use(express.json({ limit: "100gb" }));
-app.use(express.urlencoded({ extended: true, limit: "100gb" }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Logging
 app.use(requestLogger);
@@ -194,8 +199,7 @@ createBullBoard({
 
 app.use("/admin/queues", bullBoardAuth, serverAdapter.getRouter());
 
-// Direct /files route for frontend (thumbnail, download, stream endpoints)
-// These are called by the frontend via authUrl() which uses /files/... path
+// Direct /files routes remain for authenticated API clients.
 const fileService = new FileService(prisma);
 const fileController = require("./controllers/fileController").FileController;
 const fc = new fileController(fileService);
@@ -212,6 +216,7 @@ app.use("/api/folders", folderRoutes);
 app.use("/api/shares", shareRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/versions", versionRoutes);
+app.use("/api/media", mediaRoutes);
 app.use("/api/network", networkRoutes);
 
 // Error handling
@@ -229,6 +234,17 @@ app.use((_req: Request, res: Response) => {
 (async () => {
   try {
     await storageService.initialize();
+
+    try {
+      await Promise.all([
+        storageIntegrityQueue.add("startup-scan", {}, { removeOnComplete: true, removeOnFail: 100 }),
+        referenceVerificationQueue.add("startup-scan", {}, { removeOnComplete: true, removeOnFail: 100 }),
+        metadataRepairQueue.add("startup-scan", {}, { removeOnComplete: true, removeOnFail: 100 }),
+      ]);
+      console.log("Startup integrity jobs queued");
+    } catch (error) {
+      console.warn("Startup integrity jobs could not be queued", error);
+    }
     const diskStats = await storageService.getDiskStats();
     console.log(`Storage health check: OK`);
     console.log(`Available space: ${(diskStats.freeDisk / 1024 / 1024 / 1024).toFixed(2)} GB`);

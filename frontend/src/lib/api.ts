@@ -1,16 +1,12 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const getApiUrl = () => {
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:4000`;
-  }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-};
-
-const API_URL = getApiUrl();
+export const API_ORIGIN = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+export const API_BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : "/api";
+export const resolveBackendUrl = (url: string) =>
+  API_ORIGIN && url.startsWith("/api/") ? `${API_ORIGIN}${url}` : url;
 
 export const apiClient = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -51,7 +47,15 @@ const processQueue = (error: any, token: string | null = null) => {
 
 // Response interceptor to handle token refresh
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (
+      typeof response.data?.data?.url === "string" &&
+      response.data.data.url.startsWith("/api/media/")
+    ) {
+      response.data.data.url = resolveBackendUrl(response.data.data.url);
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -81,7 +85,7 @@ apiClient.interceptors.response.use(
           throw new Error("No refresh token");
         }
 
-        const response = await axios.post(`${API_URL}/api/auth/refresh`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
           refreshToken,
         });
 
@@ -243,4 +247,9 @@ export const uploadsApi = {
   status: (sessionId: string) => apiClient.get(`/uploads/status/${sessionId}`),
   resume: (sessionId: string) => apiClient.get(`/uploads/${sessionId}/resume`),
   sessions: () => apiClient.get("/uploads/sessions"),
+};
+
+export const mediaApi = {
+  sign: (fileId: string, type: "stream" | "download" | "thumbnail", size?: "small" | "medium" | "large") =>
+    apiClient.post("/media/sign", { fileId, type, size }),
 };

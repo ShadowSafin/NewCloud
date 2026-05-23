@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FileItem, useFileStore } from "@/store/fileStore";
 import { useClipboardStore } from "@/store/clipboardStore";
 import { useToastStore } from "@/store/toastStore";
-import { cn, formatFileSize, formatDate, authUrl } from "@/lib/utils";
+import { cn, formatFileSize, formatDate } from "@/lib/utils";
 import { getFileTypeInfo } from "@/lib/fileTypes";
-import { filesApi } from "@/lib/api";
+import { filesApi, mediaApi } from "@/lib/api";
 import {
   Download, Trash2, Pencil, MoreVertical, FileText, Share2, Star,
   RotateCcw, X, FolderInput, Copy, History, Link, Scissors, ClipboardPaste,
@@ -49,6 +49,7 @@ export function FileCard({
   const [isCopyOpen, setIsCopyOpen] = useState(false);
   const [isVersionOpen, setIsVersionOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(file.isFavorite || false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -57,6 +58,24 @@ export function FileCard({
   const fileTypeInfo = getFileTypeInfo(file.category);
   const Icon = fileTypeInfo.icon;
   const isSelected = isSelectedProp ?? selectedIds.has(file.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!(file.thumbnailSmall || file.thumbnail)) {
+      setThumbnailUrl(null);
+      return;
+    }
+    mediaApi.sign(file.id, "thumbnail", "small")
+      .then((res) => {
+        if (!cancelled) setThumbnailUrl(res.data.data.url);
+      })
+      .catch(() => {
+        if (!cancelled) setThumbnailUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [file.id, file.thumbnailSmall, file.thumbnail]);
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -150,7 +169,6 @@ export function FileCard({
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    console.log("FileCard click", file.id, e.detail);
     if (e.detail > 1) return;
     
     e.stopPropagation();
@@ -227,9 +245,9 @@ export function FileCard({
 
         {/* Thumbnail or Icon Container */}
         <div className="flex-1 relative m-3.5 min-h-0 rounded-xl overflow-hidden bg-black/25 border border-white/[0.03] flex items-center justify-center">
-          {file.thumbnailSmall || file.thumbnail ? (
+          {thumbnailUrl ? (
             <img
-              src={authUrl(`/files/${file.id}/thumbnail?size=small`)}
+              src={thumbnailUrl}
               alt={file.originalName}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
@@ -309,8 +327,8 @@ export function FileCard({
 
       {/* Thumbnail */}
       <div className="w-8 h-8 flex items-center justify-center shrink-0 overflow-hidden rounded-lg bg-black/20 border border-white/[0.04]">
-        {file.thumbnailSmall || file.thumbnail ? (
-          <img src={authUrl(`/files/${file.id}/thumbnail?size=small`)} alt={file.originalName} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+        {thumbnailUrl ? (
+          <img src={thumbnailUrl} alt={file.originalName} className="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
         ) : (
           <Icon className={cn("w-4.5 h-4.5 transition-transform group-hover:scale-110", catColor.text, catColor.glow)} />
         )}

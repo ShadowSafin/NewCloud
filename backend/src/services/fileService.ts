@@ -3,22 +3,21 @@ import path from "path";
 import fs from "fs";
 import { PrismaClient, File } from "@prisma/client";
 import { FileRepository } from "../repositories/FileRepository";
-import { UserRepository } from "../repositories/UserRepository";
 import { VersionService } from "./versionService";
 import { storageService } from "./storageService";
 import { fileTypeService } from "./fileTypeService";
-import { dedupService } from "./dedupService";
+import { storageBlobService } from "./storageBlobService";
+import { storageAccountingService } from "./storageAccountingService";
 import { thumbnailService } from "./thumbnailService";
+import { config } from "../config";
 import { NotFoundError, ForbiddenError, BadRequestError } from "../utils/errors";
 
 export class FileService {
   private fileRepository: FileRepository;
-  private userRepository: UserRepository;
   private versionService: VersionService;
 
   constructor(private prisma: PrismaClient) {
     this.fileRepository = new FileRepository(prisma);
-    this.userRepository = new UserRepository(prisma);
     this.versionService = new VersionService(prisma);
   }
 
@@ -30,100 +29,106 @@ export class FileService {
     const category = fileInfo.category;
     const mimeType = fileInfo.mimeType;
 
-    const storedName = `${uuidv4()}${ext}`;
-    const targetPath = storageService.getFilePath(userId, storedName);
+    if (config.blockDangerousUploads && fileTypeService.isDangerous(mimeType, ext)) {
+      try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
+      throw new BadRequestError(`File type ${ext || mimeType} is not allowed for security reasons`);
+    }
 
-    // Move file from multer temp path to files path
-    if (fs.existsSync(file.path)) {
-      fs.renameSync(file.path, targetPath);
-    } else {
+    const storedName = `${uuidv4()}${ext}`;
+    const tempPath = file.path;
+
+    if (!tempPath || !fs.existsSync(tempPath)) {
       throw new BadRequestError("Temporary upload file not found");
     }
 
     // Dynamic Binary Signature Validation (Magic-Number validation)
-    const isSignatureValid = await fileTypeService.validateSignature(targetPath, file.mimetype || mimeType);
+    const isSignatureValid = await fileTypeService.validateSignature(tempPath, file.mimetype || mimeType);
     if (!isSignatureValid) {
       try {
-        if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
       } catch {}
       throw new BadRequestError("File signature mismatch: the file contents do not match the expected type or extension");
     }
 
-    // Compute SHA-256 hash & deduplicate
-    const hash = await dedupService.computeHash(targetPath);
-    const dedup = await dedupService.deduplicate(userId, targetPath, storedName, hash);
+    const hash = await storageBlobService.computeHash(tempPath);
+    const blob = await storageBlobService.ingestFile(tempPath, BigInt(file.size), hash);
+    let createdOrUpdatedFile: File | null = null;
+    let blobCleanupPath: string | null = null;
 
-    // Check for duplicate filename in the same folder
-    const existingFile = await this.fileRepository.findByNameAndFolder(
-      userId,
-      file.originalname,
-      folderId || null
-    );
-
-    if (existingFile) {
-      // 1. Create a version backup of the existing file
-      await this.versionService.createVersion(userId, existingFile.id);
-
-      // 2. Safely release/delete the previous physical file
-      await dedupService.releaseFile(existingFile);
-
-      // 3. Update the existing file record with the new properties
-      const updatedFile = await this.fileRepository.update(existingFile.id, {
-        storedName: dedup.storedName,
-        path: dedup.path,
-        mimeType,
-        extension: ext,
-        category,
-        size: BigInt(file.size),
-        hash,
-        refCount: dedup.deduplicated ? undefined : 1,
-        thumbnail: null,
-        thumbnailSmall: null,
-        thumbnailMedium: null,
-        thumbnailLarge: null,
-      });
-
-      // Update storage used net change
-      await this.userRepository.updateStorageUsed(userId, BigInt(file.size) - BigInt(existingFile.size));
-      await storageService.invalidateCache(userId);
-
-      // Generate thumbnails asynchronously if not deduplicated
-      if (!dedup.deduplicated && fileTypeService.canThumbnail(mimeType, ext)) {
-        thumbnailService.processUploadedFile(updatedFile.id).catch((err) => {
-          console.error(`[Thumbnail] Async thumbnail generation failed for ${updatedFile.id}:`, err);
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const existingFile = await tx.file.findFirst({
+          where: {
+            userId,
+            originalName: file.originalname,
+            folderId: folderId || null,
+            deletedAt: null,
+          },
         });
-      }
 
-      return updatedFile;
+        if (existingFile) {
+          await this.versionService.createVersion(userId, existingFile.id, tx);
+          blobCleanupPath = await storageBlobService.releaseReference(existingFile.blobId, tx);
+
+          createdOrUpdatedFile = await tx.file.update({
+            where: { id: existingFile.id },
+            data: {
+              blobId: blob.id,
+              storedName,
+              path: blob.physicalPath,
+              mimeType,
+              extension: ext,
+              category,
+              size: BigInt(file.size),
+              hash,
+              refCount: blob.referenceCount,
+              thumbnail: null,
+              thumbnailSmall: null,
+              thumbnailMedium: null,
+              thumbnailLarge: null,
+            },
+          });
+        } else {
+          createdOrUpdatedFile = await tx.file.create({
+            data: {
+              userId,
+              folderId: folderId || null,
+              blobId: blob.id,
+              originalName: file.originalname,
+              storedName,
+              path: blob.physicalPath,
+              mimeType,
+              extension: ext,
+              category,
+              size: BigInt(file.size),
+              hash,
+              refCount: blob.referenceCount,
+            },
+          });
+        }
+
+        await storageAccountingService.recalculateUserUsage(userId, tx);
+      });
+    } catch (error) {
+      const cleanup = await storageBlobService.releaseReference(blob.id).catch(() => null);
+      await storageBlobService.deletePhysicalBlob(cleanup);
+      throw error;
     }
 
-    // No duplicate filename exists - create new file record
-    const createdFile = await this.fileRepository.create({
-      userId,
-      folderId: folderId || null,
-      originalName: file.originalname,
-      storedName: dedup.storedName,
-      path: dedup.path,
-      mimeType,
-      extension: ext,
-      category,
-      size: BigInt(file.size),
-      hash,
-      refCount: dedup.deduplicated ? undefined : 1,
-    });
+    await storageBlobService.deletePhysicalBlob(blobCleanupPath);
 
-    // Update storage used
-    await this.userRepository.updateStorageUsed(userId, BigInt(file.size));
-    await storageService.invalidateCache(userId);
+    if (!createdOrUpdatedFile) {
+      throw new Error("Upload completed without creating or updating a file record");
+    }
 
-    // Generate thumbnails asynchronously if not deduplicated
-    if (!dedup.deduplicated && fileTypeService.canThumbnail(mimeType, ext)) {
-      thumbnailService.processUploadedFile(createdFile.id).catch((err) => {
-        console.error(`[Thumbnail] Async thumbnail generation failed for ${createdFile.id}:`, err);
+    const uploadedFile = createdOrUpdatedFile as File;
+    if (fileTypeService.canThumbnail(mimeType, ext)) {
+      thumbnailService.processUploadedFile(uploadedFile.id).catch((err) => {
+        console.error(`[Thumbnail] Async thumbnail generation failed for ${uploadedFile.id}:`, err);
       });
     }
 
-    return createdFile;
+    return uploadedFile;
   }
 
   async findAll(
@@ -163,7 +168,7 @@ export class FileService {
   }
 
   async update(userId: string, id: string, originalName: string): Promise<File> {
-    const file = await this.findById(userId, id);
+    await this.findById(userId, id);
     return this.fileRepository.update(id, { originalName });
   }
 
@@ -195,13 +200,11 @@ export class FileService {
       return file; // Already trashed
     }
 
-    const updated = await this.fileRepository.update(id, { deletedAt: new Date() });
-
-    // Decrement storageUsed and increment trashSize
-    await this.userRepository.updateStorageUsed(userId, -BigInt(file.size));
-    await this.userRepository.updateTrashSize(userId, BigInt(file.size));
-    await storageService.invalidateCache(userId);
-
+    let updated!: File;
+    await this.prisma.$transaction(async (tx) => {
+      updated = await tx.file.update({ where: { id }, data: { deletedAt: new Date() } });
+      await storageAccountingService.recalculateUserUsage(userId, tx);
+    });
     return updated;
   }
 
@@ -211,32 +214,37 @@ export class FileService {
       return file; // Not in trash
     }
 
-    const updated = await this.fileRepository.update(id, { deletedAt: null });
-
-    // Increment storageUsed and decrement trashSize
-    await this.userRepository.updateStorageUsed(userId, BigInt(file.size));
-    await this.userRepository.updateTrashSize(userId, -BigInt(file.size));
-    await storageService.invalidateCache(userId);
-
+    let updated!: File;
+    await this.prisma.$transaction(async (tx) => {
+      updated = await tx.file.update({ where: { id }, data: { deletedAt: null } });
+      await storageAccountingService.recalculateUserUsage(userId, tx);
+    });
     return updated;
   }
 
   async permanentDelete(userId: string, id: string): Promise<void> {
     const file = await this.findById(userId, id);
+    const versions = await this.prisma.fileVersion.findMany({ where: { fileId: id } });
+    let blobCleanupPath: string | null = null;
+    const versionBlobCleanupPaths: string[] = [];
 
-    // Release file reference (dedup check & physical file delete if last ref)
-    await dedupService.releaseFile(file);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.file.delete({ where: { id } });
+      blobCleanupPath = await storageBlobService.releaseReference(file.blobId, tx);
+      for (const version of versions) {
+        const cleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+        if (cleanupPath) versionBlobCleanupPaths.push(cleanupPath);
+      }
+      await storageAccountingService.recalculateUserUsage(userId, tx);
+    });
 
-    // Delete record from DB
-    await this.fileRepository.delete(id);
-
-    // Update user stats
-    if (file.deletedAt) {
-      await this.userRepository.updateTrashSize(userId, -BigInt(file.size));
-    } else {
-      await this.userRepository.updateStorageUsed(userId, -BigInt(file.size));
+    await storageBlobService.deletePhysicalBlob(blobCleanupPath);
+    for (const cleanupPath of versionBlobCleanupPaths) {
+      await storageBlobService.deletePhysicalBlob(cleanupPath);
     }
-    await storageService.invalidateCache(userId);
+    if (!file.blobId && storageService.isSafePathGlobal(file.path)) {
+      try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
+    }
   }
 
   async listTrash(userId: string): Promise<File[]> {
@@ -245,46 +253,63 @@ export class FileService {
 
   async emptyTrash(userId: string): Promise<void> {
     const trashedFiles = await this.listTrash(userId);
+    const blobCleanupPaths: string[] = [];
+    const versionsByFile = new Map<string, { blobId: string | null }[]>();
     for (const file of trashedFiles) {
-      await dedupService.releaseFile(file);
-      await this.fileRepository.delete(file.id);
+      versionsByFile.set(file.id, await this.prisma.fileVersion.findMany({
+        where: { fileId: file.id },
+        select: { blobId: true },
+      }));
     }
 
-    // Set trash size to 0
-    const user = await this.userRepository.findById(userId);
-    if (user) {
-      await this.userRepository.update(userId, { trashSize: 0 });
+    await this.prisma.$transaction(async (tx) => {
+      for (const file of trashedFiles) {
+        await tx.file.delete({ where: { id: file.id } });
+        const cleanupPath = await storageBlobService.releaseReference(file.blobId, tx);
+        if (cleanupPath) blobCleanupPaths.push(cleanupPath);
+        for (const version of versionsByFile.get(file.id) || []) {
+          const versionCleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+          if (versionCleanupPath) blobCleanupPaths.push(versionCleanupPath);
+        }
+      }
+      await storageAccountingService.recalculateUserUsage(userId, tx);
+    });
+
+    for (const cleanupPath of blobCleanupPaths) {
+      await storageBlobService.deletePhysicalBlob(cleanupPath);
     }
-    await storageService.invalidateCache(userId);
+    for (const file of trashedFiles) {
+      if (!file.blobId && storageService.isSafePathGlobal(file.path)) {
+        try { if (fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
+      }
+    }
   }
 
   async copy(userId: string, id: string, folderId: string | null): Promise<File> {
     const file = await this.findById(userId, id);
     const newStoredName = `${uuidv4()}${file.extension}`;
+    let copiedFile!: File;
 
-    // Increment refCount on ALL files sharing this physical path
-    const newRefCount = file.refCount + 1;
-    await this.prisma.file.updateMany({
-      where: { path: file.path },
-      data: { refCount: newRefCount },
+    await this.prisma.$transaction(async (tx) => {
+      const blob = file.blobId ? await storageBlobService.addReference(file.blobId, tx) : null;
+      copiedFile = await tx.file.create({
+        data: {
+          userId,
+          folderId,
+          blobId: file.blobId,
+          originalName: `Copy of ${file.originalName}`,
+          storedName: newStoredName,
+          path: blob?.physicalPath || file.path,
+          mimeType: file.mimeType,
+          extension: file.extension,
+          category: file.category,
+          size: file.size,
+          hash: file.hash,
+          refCount: blob?.referenceCount || file.refCount,
+        },
+      });
+      await storageAccountingService.recalculateUserUsage(userId, tx);
     });
-
-    const copiedFile = await this.fileRepository.create({
-      userId,
-      folderId,
-      originalName: `Copy of ${file.originalName}`,
-      storedName: newStoredName,
-      path: file.path,
-      mimeType: file.mimeType,
-      extension: file.extension,
-      category: file.category,
-      size: file.size,
-      hash: file.hash,
-      refCount: newRefCount,
-    });
-
-    await this.userRepository.updateStorageUsed(userId, file.size);
-    await storageService.invalidateCache(userId);
 
     return copiedFile;
   }

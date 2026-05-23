@@ -1,8 +1,9 @@
 import { apiClient } from "./api";
 
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_CONCURRENT = 3;
 const MAX_RETRIES = 3;
+const MERGE_POLL_INTERVAL_MS = 1000;
+const MAX_MERGE_WAIT_MS = 24 * 60 * 60 * 1000;
 const STORAGE_KEY = "cloudstore-upload-queue";
 
 export interface UploadSession {
@@ -97,6 +98,41 @@ export async function getUploadStatus(sessionId: string): Promise<any> {
 export async function getResumeInfo(sessionId: string): Promise<any> {
   const res = await apiClient.get(`/uploads/${sessionId}/resume`);
   return res.data.data;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForMergeCompletion(
+  task: UploadTask,
+  onProgress?: (task: UploadTask) => void
+): Promise<void> {
+  const startedAt = Date.now();
+
+  while (task.status === "merging") {
+    const status = await getUploadStatus(task.sessionId);
+
+    if (status.status === "completed") {
+      task.status = "completed";
+      task.progress = 1;
+      task.completedAt = Date.now();
+      onProgress?.(task);
+      return;
+    }
+
+    if (status.status === "failed" || status.status === "cancelled") {
+      throw new Error(`Upload ${status.status} while finalizing`);
+    }
+
+    if (Date.now() - startedAt > MAX_MERGE_WAIT_MS) {
+      throw new Error("Upload finalization timed out");
+    }
+
+    task.progress = Math.max(task.progress, 0.99);
+    onProgress?.(task);
+    await sleep(MERGE_POLL_INTERVAL_MS);
+  }
 }
 
 // --- Chunk hashing ---
@@ -243,8 +279,7 @@ export async function resumeUpload(
     task.status = "merging";
     task.progress = 1;
     await completeUpload(task.sessionId);
-    task.status = "completed";
-    task.completedAt = Date.now();
+    await waitForMergeCompletion(task, onProgress);
     return task;
   }
 
@@ -318,10 +353,7 @@ async function runUpload(
     onProgress?.(task);
 
     await completeUpload(task.sessionId);
-    task.status = "completed";
-    task.progress = 1;
-    task.completedAt = Date.now();
-    onProgress?.(task);
+    await waitForMergeCompletion(task, onProgress);
   } catch (err: any) {
     if (task.status !== "paused" && task.status !== "cancelled") {
       task.status = "failed";

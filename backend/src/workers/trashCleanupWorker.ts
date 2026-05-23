@@ -3,6 +3,8 @@ import fs from "fs";
 import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
 import { config } from "../config";
+import { storageBlobService } from "../services/storageBlobService";
+import { storageAccountingService } from "../services/storageAccountingService";
 
 export function createTrashCleanupWorker(): Worker {
   const worker = new Worker(
@@ -21,53 +23,39 @@ export function createTrashCleanupWorker(): Worker {
         },
       });
 
-      let deletedSize = 0n;
       let deletedCount = 0;
+      const affectedUsers = new Set<string>();
 
       for (const file of expiredFiles) {
-        // Handle refCount for dedup
-        if (file.refCount > 1) {
-          await prisma.file.update({
-            where: { id: file.id },
-            data: { refCount: { decrement: 1 } },
-          });
-        } else {
-          // Delete physical file
+        const versions = await prisma.fileVersion.findMany({ where: { fileId: file.id } });
+        const cleanupPaths: string[] = [];
+        await prisma.$transaction(async (tx) => {
+          await tx.file.delete({ where: { id: file.id } });
+          const fileCleanupPath = await storageBlobService.releaseReference(file.blobId, tx);
+          if (fileCleanupPath) cleanupPaths.push(fileCleanupPath);
+          for (const version of versions) {
+            const versionCleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+            if (versionCleanupPath) cleanupPaths.push(versionCleanupPath);
+          }
+        });
+        for (const cleanupPath of cleanupPaths) {
+          await storageBlobService.deletePhysicalBlob(cleanupPath);
+        }
+        if (!file.blobId) {
           try {
             if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
           } catch {}
-
-          // Delete thumbnails
-          try {
-            const thumbFiles = [file.thumbnail, file.thumbnailSmall, file.thumbnailMedium, file.thumbnailLarge].filter(Boolean);
-            for (const t of thumbFiles) {
-              if (t && fs.existsSync(t)) fs.unlinkSync(t);
-            }
-          } catch {}
         }
 
-        // Update user trash size
-        deletedSize += BigInt(Number(file.size));
+        try {
+          const thumbFiles = [file.thumbnail, file.thumbnailSmall, file.thumbnailMedium, file.thumbnailLarge].filter(Boolean);
+          for (const t of thumbFiles) {
+            if (t && fs.existsSync(t)) fs.unlinkSync(t);
+          }
+        } catch {}
+
         deletedCount++;
-
-        await prisma.file.delete({ where: { id: file.id } });
-      }
-
-      // Update user trash sizes
-      if (deletedCount > 0) {
-        // Group files by user to update trash sizes
-        const userSizes = new Map<string, bigint>();
-        for (const file of expiredFiles) {
-          const current = userSizes.get(file.userId) || 0n;
-          userSizes.set(file.userId, current + BigInt(Number(file.size)));
-        }
-
-        for (const [userId, size] of userSizes) {
-          await prisma.user.update({
-            where: { id: userId },
-            data: { trashSize: { decrement: Number(size) } },
-          });
-        }
+        affectedUsers.add(file.userId);
       }
 
       // Find expired trashed folders
@@ -78,7 +66,12 @@ export function createTrashCleanupWorker(): Worker {
       });
 
       for (const folder of expiredFolders) {
+        affectedUsers.add(folder.userId);
         await permanentDeleteFolderRecursive(folder.id);
+      }
+
+      for (const userId of affectedUsers) {
+        await storageAccountingService.recalculateUserUsage(userId);
       }
 
       console.log(`Trash cleanup complete: ${deletedCount} files, ${expiredFolders.length} folders deleted`);
@@ -117,12 +110,25 @@ async function permanentDeleteFolderRecursive(folderId: string): Promise<void> {
   });
 
   for (const file of files) {
-    if (file.refCount <= 1) {
+    const versions = await prisma.fileVersion.findMany({ where: { fileId: file.id } });
+    const cleanupPaths: string[] = [];
+    await prisma.$transaction(async (tx) => {
+      await tx.file.delete({ where: { id: file.id } });
+      const fileCleanupPath = await storageBlobService.releaseReference(file.blobId, tx);
+      if (fileCleanupPath) cleanupPaths.push(fileCleanupPath);
+      for (const version of versions) {
+        const versionCleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+        if (versionCleanupPath) cleanupPaths.push(versionCleanupPath);
+      }
+    });
+    for (const cleanupPath of cleanupPaths) {
+      await storageBlobService.deletePhysicalBlob(cleanupPath);
+    }
+    if (!file.blobId) {
       try {
         if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       } catch {}
     }
-    await prisma.file.delete({ where: { id: file.id } });
   }
 
   // Delete the folder

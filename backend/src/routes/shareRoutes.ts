@@ -45,7 +45,7 @@ router.get("/public/:token/download", asyncHandler(async (req: any, res: any) =>
   const { filePath, file } = await shareService.getSharedFilePath(token, password as string | undefined);
 
   // Enforce path traversal defense
-  if (!storageService.isSafePath(file.userId, filePath)) {
+  if (!storageService.isSafePathGlobal(filePath)) {
     throw new ForbiddenError("Access denied: Invalid file path");
   }
 
@@ -69,7 +69,7 @@ router.get("/public/:token/stream", asyncHandler(async (req: any, res: any) => {
   const { filePath, file } = await shareService.getSharedFilePath(token, password as string | undefined);
 
   // Enforce path traversal defense
-  if (!storageService.isSafePath(file.userId, filePath)) {
+  if (!storageService.isSafePathGlobal(filePath)) {
     throw new ForbiddenError("Access denied: Invalid file path");
   }
 

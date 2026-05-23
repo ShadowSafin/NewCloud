@@ -16,6 +16,11 @@ export class StorageService {
       fs.mkdirSync(this.rootPath, { recursive: true });
       console.log(`Created storage root: ${this.rootPath}`);
     }
+    for (const dir of [this.getBlobsPath(), this.getTempPath()]) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
 
     // Verify storage is writable
     try {
@@ -61,6 +66,19 @@ export class StorageService {
     return path.join(this.rootPath, userId, "versions");
   }
 
+  getBlobsPath(): string {
+    return path.join(this.rootPath, "blobs");
+  }
+
+  getBlobPath(hash: string): string {
+    const normalizedHash = hash.toLowerCase();
+    return path.join(this.getBlobsPath(), normalizedHash.slice(0, 2), normalizedHash);
+  }
+
+  getTempPath(): string {
+    return path.join(this.rootPath, "tmp");
+  }
+
   getFilePath(userId: string, storedName: string): string {
     return path.join(this.getUserFilesPath(userId), storedName);
   }
@@ -76,6 +94,8 @@ export class StorageService {
       this.getUserThumbnailsPath(userId),
       this.getUserUploadsPath(userId),
       this.getUserVersionsPath(userId),
+      this.getBlobsPath(),
+      this.getTempPath(),
     ];
 
     for (const dir of dirs) {
@@ -92,7 +112,7 @@ export class StorageService {
     }
   }
 
-  async deleteFolder(userId: string, folderId: string): Promise<void> {
+  async deleteFolder(_userId: string, _folderId: string): Promise<void> {
     // This is a no-op since files are stored flat by UUID, not in folder hierarchy
     // The folder is just a DB concept
   }

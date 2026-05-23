@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Mail, Calendar, HardDrive, Globe, QrCode, Copy, Check } from "lucide-react";
+import { User, Mail, Calendar, HardDrive, Globe, QrCode, Copy, Check, Menu, ArrowLeft } from "lucide-react";
 import { filesApi, apiClient } from "@/lib/api";
 import { AppShell } from "@/components/layout/app-shell";
 import QRCode from "qrcode";
@@ -16,9 +16,41 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
+interface SettingsHeaderProps {
+  onToggleSidebar?: () => void;
+}
+
+function SettingsHeader({ onToggleSidebar }: SettingsHeaderProps) {
+  const router = useRouter();
+  return (
+    <div className="h-14 border-b border-white/[0.06] bg-black/25 backdrop-blur-md flex items-center justify-between px-6 shrink-0 relative z-20 safe-pt">
+      <div className="flex items-center gap-3">
+        {/* Hamburger Menu on Mobile */}
+        <button
+          onClick={onToggleSidebar}
+          className="p-1.5 rounded-lg hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all md:hidden text-white/70 hover:text-white"
+          aria-label="Toggle Menu"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
+        <span className="text-sm text-white/90 font-medium">Settings</span>
+      </div>
+      
+      {/* Back to drive button */}
+      <button
+        onClick={() => router.push("/")}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] text-xs text-white/70 hover:text-white transition-all"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        <span>Back to Drive</span>
+      </button>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading, hasHydrated } = useAuthStore();
 
   const [mounted, setMounted] = useState(false);
 
@@ -38,10 +70,10 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (mounted && !authLoading && !isAuthenticated) {
+    if (mounted && hasHydrated && !authLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [mounted, authLoading, isAuthenticated, router]);
+  }, [mounted, hasHydrated, authLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -90,7 +122,7 @@ export default function SettingsPage() {
     }).catch(err => console.error("QR Code generation failed:", err));
   };
 
-  if (!mounted || authLoading) {
+  if (!mounted || !hasHydrated || authLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-canvas">
         <div className="w-6 h-6 border-2 border-hairline border-t-ink rounded-full animate-spin" />
@@ -104,11 +136,9 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="h-14 border-b border-hairline bg-canvas flex items-center px-6">
-        <span className="text-sm text-ink">Settings</span>
-      </div>
+      <SettingsHeader />
 
-      <div className="flex-1 overflow-auto px-6 py-8">
+      <div className="flex-1 overflow-auto px-4 sm:px-6 py-6 sm:py-8 safe-pb">
         <div className="max-w-2xl mx-auto space-y-8">
           {/* Header */}
           <div>

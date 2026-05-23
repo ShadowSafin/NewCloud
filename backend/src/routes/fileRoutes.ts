@@ -3,14 +3,23 @@ import { FileController } from "../controllers/fileController";
 import { authenticate } from "../middleware/auth";
 import { validate, validateQuery } from "../middleware/validate";
 import { upload } from "../middleware/upload";
+import { validateUpload } from "../middleware/uploadValidation";
+import { rateLimitPerUser } from "../middleware/rateLimitPerUser";
 import { fileQuerySchema, updateFileSchema } from "../utils/validators";
 import { FileService } from "../services/fileService";
 import { storageService } from "../services/storageService";
 import { prisma } from "../db";
+import { config } from "../config";
 
 const router = Router();
 const fileService = new FileService(prisma);
 const fileController = new FileController(fileService);
+const uploadLimiter = rateLimitPerUser({
+  windowMs: 60_000,
+  max: config.maxUploadsPerMinute,
+  keyPrefix: "file-upload",
+  message: "Too many uploads. Please slow down and try again.",
+});
 
 const asyncHandler = (fn: any) => (req: any, res: any, next: any) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -32,8 +41,8 @@ router.get("/storage", authenticate, asyncHandler(async (req: any, res: any) => 
   });
 }));
 
-router.post("/upload", authenticate, upload.single("file"), asyncHandler(fileController.upload));
-router.post("/upload-multiple", authenticate, upload.array("files", 100), asyncHandler(fileController.uploadMultiple));
+router.post("/upload", authenticate, uploadLimiter, upload.single("file"), asyncHandler(validateUpload), asyncHandler(fileController.upload));
+router.post("/upload-multiple", authenticate, uploadLimiter, upload.array("files", 100), asyncHandler(fileController.uploadMultiple));
 router.post("/bulk", authenticate, asyncHandler(fileController.bulkAction));
 
 router.get("/", authenticate, validateQuery(fileQuerySchema), asyncHandler(fileController.findAll));

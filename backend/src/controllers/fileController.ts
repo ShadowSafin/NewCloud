@@ -14,6 +14,7 @@ const shouldSandbox = (mimeType: string, extension: string): boolean => {
 
   return (
     category === "code" ||
+    category === "executables" ||
     category === "databases" ||
     category === "unknown" ||
     mime.startsWith("text/") ||
@@ -130,8 +131,12 @@ export class FileController {
     const filePath = await this.fileService.getFilePath(userId, id);
 
     // Enforce path traversal defense
-    if (!storageService.isSafePath(userId, filePath)) {
+    if (!storageService.isSafePathGlobal(filePath)) {
       throw new ForbiddenError("Access denied: Invalid file path");
+    }
+
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundError("File not found on disk");
     }
 
     if (shouldSandbox(file.mimeType, file.extension)) {
@@ -295,7 +300,7 @@ export class FileController {
     const filePath = await this.fileService.getFilePath(userId, id);
 
     // Enforce path traversal defense
-    if (!storageService.isSafePath(userId, filePath)) {
+    if (!storageService.isSafePathGlobal(filePath)) {
       throw new ForbiddenError("Access denied: Invalid file path");
     }
 
@@ -315,6 +320,10 @@ export class FileController {
       const parts = range.replace(/bytes=/, "").split("-");
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || end >= fileSize) {
+        res.status(416).end();
+        return;
+      }
       const chunksize = end - start + 1;
 
       res.status(206);

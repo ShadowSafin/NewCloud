@@ -39,11 +39,17 @@ export class UploadController {
       throw new BadRequestError("Chunk data is required");
     }
 
-    const result = await this.uploadService.uploadChunk(
+    const chunkIndexNum = parseInt(chunkIndex, 10);
+    if (!Number.isInteger(chunkIndexNum) || chunkIndexNum < 0) {
+      throw new BadRequestError("Invalid chunk index");
+    }
+
+    const result = await this.uploadService.uploadChunkFromFile(
       userId,
       sessionId,
-      parseInt(chunkIndex),
-      req.file.buffer,
+      chunkIndexNum,
+      req.file.path,
+      BigInt(req.file.size),
       hash
     );
 

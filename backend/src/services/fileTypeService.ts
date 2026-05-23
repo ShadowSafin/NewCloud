@@ -302,8 +302,53 @@ class FileTypeService {
   }
 
   async validateSignature(filePath: string, expectedMime: string): Promise<boolean> {
-    // Always return true to allow keeping every kind of file in the world without blocking
-    return true;
+    const mime = (expectedMime || "application/octet-stream").toLowerCase();
+    if (mime === "application/octet-stream" || mime.startsWith("text/")) {
+      return true;
+    }
+
+    const signatures: Array<{ mime: string; offset: number; bytes: number[] }> = [
+      { mime: "image/jpeg", offset: 0, bytes: [0xff, 0xd8, 0xff] },
+      { mime: "image/png", offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
+      { mime: "image/gif", offset: 0, bytes: [0x47, 0x49, 0x46] },
+      { mime: "image/webp", offset: 8, bytes: [0x57, 0x45, 0x42, 0x50] },
+      { mime: "application/pdf", offset: 0, bytes: [0x25, 0x50, 0x44, 0x46] },
+      { mime: "application/zip", offset: 0, bytes: [0x50, 0x4b] },
+      { mime: "video/mp4", offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] },
+    ];
+
+    const compatibleMime = (signatureMime: string) => {
+      if (mime === signatureMime) return true;
+      if (signatureMime === "application/zip") {
+        return [
+          "application/zip",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "application/epub+zip",
+        ].includes(mime);
+      }
+      if (signatureMime === "video/mp4") {
+        return mime === "video/quicktime" || mime === "video/x-m4v";
+      }
+      return false;
+    };
+
+    const relevant = signatures.filter((sig) => compatibleMime(sig.mime));
+    if (relevant.length === 0) return true;
+
+    const maxBytes = Math.max(...relevant.map((sig) => sig.offset + sig.bytes.length));
+    const handle = await fs.promises.open(filePath, "r");
+    try {
+      const buffer = Buffer.alloc(maxBytes);
+      const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
+      return relevant.some((sig) => {
+        if (bytesRead < sig.offset + sig.bytes.length) return false;
+        return sig.bytes.every((byte, index) => buffer[sig.offset + index] === byte);
+      });
+    } finally {
+      await handle.close();
+    }
   }
 }
 

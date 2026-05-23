@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { FileItem } from "@/store/fileStore";
 import { getFileTypeInfo, formatFileSize } from "@/lib/fileTypes";
-import { authUrl } from "@/lib/utils";
+import { apiClient, mediaApi } from "@/lib/api";
 import {
   X,
   Download,
@@ -53,6 +53,8 @@ export function PreviewModal({
   const [textContent, setTextContent] = useState<string>("");
   const [textLoading, setTextLoading] = useState(false);
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
+  const [streamUrl, setStreamUrl] = useState<string>("");
+  const [downloadUrl, setDownloadUrl] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const fileTypeInfo = file ? getFileTypeInfo(file.category) : null;
@@ -69,11 +71,22 @@ export function PreviewModal({
     setZoom(1);
     setTextContent("");
     setHighlightedHtml("");
+    setStreamUrl("");
+    setDownloadUrl("");
+
+    if (file && isOpen) {
+      mediaApi.sign(file.id, "stream")
+        .then((res) => setStreamUrl(res.data.data.url))
+        .catch(() => setStreamUrl(""));
+      mediaApi.sign(file.id, "download")
+        .then((res) => setDownloadUrl(res.data.data.url))
+        .catch(() => setDownloadUrl(""));
+    }
 
     if (file && isText && isOpen) {
       setTextLoading(true);
-      fetch(authUrl(`/api/files/${file.id}/stream`))
-        .then((res) => res.text())
+      apiClient.get(`/files/${file.id}/stream`, { responseType: "text" })
+        .then((res) => res.data as string)
         .then(async (text) => {
           setTextContent(text);
           if (isJson) {
@@ -95,8 +108,8 @@ export function PreviewModal({
 
     if (file && isMarkdown && isOpen) {
       setTextLoading(true);
-      fetch(authUrl(`/api/files/${file.id}/stream`))
-        .then((res) => res.text())
+      apiClient.get(`/files/${file.id}/stream`, { responseType: "text" })
+        .then((res) => res.data as string)
         .then((text) => setTextContent(text))
         .catch(() => setTextContent("Failed to load file content"))
         .finally(() => setTextLoading(false));
@@ -109,7 +122,11 @@ export function PreviewModal({
       if (e.key === "Escape") onClose();
       if (e.key === " " && (isVideo || isAudio) && videoRef.current) {
         e.preventDefault();
-        videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause();
+        if (videoRef.current.paused) {
+          void videoRef.current.play();
+        } else {
+          videoRef.current.pause();
+        }
       }
       if (e.key === "ArrowRight" && isImage) onNext?.();
       if (e.key === "ArrowLeft" && isImage) onPrev?.();
@@ -120,12 +137,16 @@ export function PreviewModal({
 
   if (!file || !isOpen) return null;
 
+  const openDownload = () => {
+    if (downloadUrl) window.open(downloadUrl);
+  };
+
   const renderPreview = () => {
     if (isImage) {
       return (
         <div className="relative flex items-center justify-center overflow-hidden min-h-[200px] bg-canvas">
           <img
-            src={authUrl(`/api/files/${file.id}/stream`)}
+            src={streamUrl}
             alt={file.originalName}
             className="max-w-full max-h-[70vh] w-auto h-auto object-contain transition-transform"
             style={{ transform: `scale(${zoom})` }}
@@ -145,7 +166,7 @@ export function PreviewModal({
             preload="metadata"
             playsInline
           >
-            <source src={authUrl(`/api/files/${file.id}/stream`)} type={file.mimeType} />
+            <source src={streamUrl} type={file.mimeType} />
           </video>
         </div>
       );
@@ -159,7 +180,7 @@ export function PreviewModal({
           </div>
           <p className="text-sm text-ink mb-6 truncate max-w-md">{file.originalName}</p>
           <audio ref={videoRef} controls className="w-full max-w-md">
-            <source src={authUrl(`/api/files/${file.id}/stream`)} type={file.mimeType} />
+            <source src={streamUrl} type={file.mimeType} />
           </audio>
         </div>
       );
@@ -168,7 +189,7 @@ export function PreviewModal({
     if (isPdf) {
       return (
         <iframe
-          src={authUrl(`/api/files/${file.id}/stream`)}
+          src={streamUrl}
           className="w-full h-[70vh] border-0"
           title={file.originalName}
         />
@@ -205,7 +226,7 @@ export function PreviewModal({
         <p className="text-xs text-body-mid mb-6">{formatFileSize(file.size)}</p>
         <button
           className="btn-pill-primary"
-          onClick={() => window.open(authUrl(`/api/files/${file.id}/download`))}
+          onClick={openDownload}
         >
           <Download className="w-4 h-4" />
           Download
@@ -242,7 +263,7 @@ export function PreviewModal({
                 </button>
               </>
             )}
-            <button onClick={() => window.open(authUrl(`/api/files/${file.id}/download`))} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors">
+            <button onClick={openDownload} className="p-1.5 rounded-sm hover:bg-canvas-mid transition-colors">
               <Download className="w-4 h-4 text-body-mid" />
             </button>
             {onShare && (
@@ -283,7 +304,7 @@ export function PreviewModal({
           <div className="flex items-center gap-2">
             <button
               className="btn-pill text-xs h-8"
-              onClick={() => window.open(authUrl(`/api/files/${file.id}/download`))}
+              onClick={openDownload}
             >
               <Download className="w-3.5 h-3.5" />
               Download

@@ -1,20 +1,20 @@
-import { PrismaClient, Folder } from "@prisma/client";
+import { PrismaClient, File } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
 import { storageService } from "./storageService";
 import { NotFoundError, ForbiddenError, ConflictError } from "../utils/errors";
 import { FolderTree } from "../types";
 import { FolderRepository } from "../repositories/FolderRepository";
 import { FileRepository } from "../repositories/FileRepository";
-import { UserRepository } from "../repositories/UserRepository";
+import { storageBlobService } from "./storageBlobService";
+import { storageAccountingService } from "./storageAccountingService";
 
 export class FolderService {
   private folderRepository: FolderRepository;
   private fileRepository: FileRepository;
-  private userRepository: UserRepository;
 
   constructor(private prisma: PrismaClient) {
     this.folderRepository = new FolderRepository(prisma);
     this.fileRepository = new FileRepository(prisma);
-    this.userRepository = new UserRepository(prisma);
   }
 
   async create(
@@ -171,26 +171,7 @@ export class FolderService {
   }
 
   async delete(userId: string, id: string): Promise<void> {
-    const folder = await this.folderRepository.findById(id);
-
-    if (!folder) {
-      throw new NotFoundError("Folder not found");
-    }
-
-    if (folder.userId !== userId) {
-      throw new ForbiddenError("Access denied");
-    }
-
-    for (const file of folder.files) {
-      await storageService.deleteFile(userId, file.storedName);
-    }
-
-    for (const child of folder.children) {
-      await this.delete(userId, child.id);
-    }
-
-    await storageService.deleteFolder(userId, folder.id);
-    await this.folderRepository.delete(id);
+    await this.permanentDelete(userId, id);
   }
 
   // === Trash operations (soft delete) ===
@@ -199,44 +180,21 @@ export class FolderService {
     const folder = await this.folderRepository.findById(folderId);
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
+    if (folder.deletedAt) return;
 
-    const totalSize = await this.softDeleteRecursive(userId, folderId);
-
-    // Update user trash size
-    if (totalSize > 0) {
-      await this.userRepository.updateTrashSize(userId, BigInt(totalSize));
-    }
-  }
-
-  private async softDeleteRecursive(userId: string, folderId: string): Promise<number> {
-    let totalSize = 0;
-
-    // Soft-delete all files in this folder
-    const { files } = await this.fileRepository.findAll({
-      userId,
-      folderId,
-      deletedAt: null,
+    const folderIds = await this.getFolderIdsRecursive(userId, folderId);
+    const deletedAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.file.updateMany({
+        where: { userId, folderId: { in: folderIds }, deletedAt: null },
+        data: { deletedAt },
+      });
+      await tx.folder.updateMany({
+        where: { userId, id: { in: folderIds }, deletedAt: null },
+        data: { deletedAt },
+      });
+      await storageAccountingService.recalculateUserUsage(userId, tx);
     });
-
-    for (const file of files) {
-      await this.fileRepository.update(file.id, { deletedAt: new Date() });
-      totalSize += Number(file.size);
-    }
-
-    // Recursively soft-delete child folders
-    const children = await this.folderRepository.findMany({
-      parentId: folderId,
-      deletedAt: null,
-    });
-
-    for (const child of children) {
-      totalSize += await this.softDeleteRecursive(userId, child.id);
-    }
-
-    // Soft-delete this folder
-    await this.folderRepository.update(folderId, { deletedAt: new Date() });
-
-    return totalSize;
   }
 
   async restore(userId: string, folderId: string): Promise<void> {
@@ -245,43 +203,18 @@ export class FolderService {
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
     if (!folder.deletedAt) return; // Not trashed
 
-    const totalSize = await this.restoreRecursive(userId, folderId);
-
-    // Update user trash size
-    if (totalSize > 0) {
-      await this.userRepository.updateTrashSize(userId, -BigInt(totalSize));
-    }
-  }
-
-  private async restoreRecursive(userId: string, folderId: string): Promise<number> {
-    let totalSize = 0;
-
-    // Restore all files in this folder
-    const { files } = await this.fileRepository.findAll({
-      userId,
-      folderId,
-      deletedAt: { not: null } as any,
+    const folderIds = await this.getFolderIdsRecursive(userId, folderId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.folder.updateMany({
+        where: { userId, id: { in: folderIds }, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      await tx.file.updateMany({
+        where: { userId, folderId: { in: folderIds }, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      await storageAccountingService.recalculateUserUsage(userId, tx);
     });
-
-    for (const file of files) {
-      await this.fileRepository.update(file.id, { deletedAt: null });
-      totalSize += Number(file.size);
-    }
-
-    // Recursively restore child folders
-    const children = await this.folderRepository.findMany({
-      parentId: folderId,
-      deletedAt: { not: null } as any,
-    });
-
-    for (const child of children) {
-      totalSize += await this.restoreRecursive(userId, child.id);
-    }
-
-    // Restore this folder
-    await this.folderRepository.update(folderId, { deletedAt: null });
-
-    return totalSize;
   }
 
   async permanentDelete(userId: string, folderId: string): Promise<void> {
@@ -289,46 +222,46 @@ export class FolderService {
     if (!folder) throw new NotFoundError("Folder not found");
     if (folder.userId !== userId) throw new ForbiddenError("Access denied");
 
-    const totalSize = await this.permanentDeleteRecursive(userId, folderId);
-
-    // Update storage counters
-    if (totalSize > 0) {
-      await this.userRepository.updateStorageUsed(userId, -BigInt(totalSize));
-      await this.userRepository.updateTrashSize(userId, -BigInt(totalSize));
-    }
-  }
-
-  private async permanentDeleteRecursive(userId: string, folderId: string): Promise<number> {
-    let totalSize = 0;
-
-    // Get child folders
-    const children = await this.folderRepository.findMany({
-      parentId: folderId,
+    const folderIds = await this.getFolderIdsRecursive(userId, folderId);
+    const files = await this.prisma.file.findMany({
+      where: { userId, folderId: { in: folderIds } },
     });
 
-    for (const child of children) {
-      totalSize += await this.permanentDeleteRecursive(userId, child.id);
-    }
+    const fileIds = files.map((file) => file.id);
+    const versions = fileIds.length
+      ? await this.prisma.fileVersion.findMany({
+          where: { fileId: { in: fileIds } },
+        })
+      : [];
+    const cleanupPaths: string[] = [];
 
-    // Delete all files in this folder
-    const { files } = await this.fileRepository.findAll({
-      userId,
-      folderId,
+    await this.prisma.$transaction(async (tx) => {
+      for (const file of files) {
+        await tx.file.delete({ where: { id: file.id } });
+        const cleanupPath = await storageBlobService.releaseReference(file.blobId, tx);
+        if (cleanupPath) cleanupPaths.push(cleanupPath);
+      }
+
+      for (const version of versions) {
+        const cleanupPath = await storageBlobService.releaseReference(version.blobId, tx);
+        if (cleanupPath) cleanupPaths.push(cleanupPath);
+      }
+
+      await tx.folder.deleteMany({ where: { userId, id: { in: folderIds } } });
+      await storageAccountingService.recalculateUserUsage(userId, tx);
     });
 
+    for (const cleanupPath of cleanupPaths) {
+      await storageBlobService.deletePhysicalBlob(cleanupPath);
+    }
     for (const file of files) {
-      try {
-        const fs = require("fs");
-        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-      } catch {}
-      totalSize += Number(file.size);
-      await this.fileRepository.delete(file.id);
+      if (!file.blobId && storageService.isSafePathGlobal(file.path)) {
+        try {
+          const fs = require("fs");
+          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+        } catch {}
+      }
     }
-
-    // Delete the folder
-    await this.folderRepository.delete(folderId);
-
-    return totalSize;
   }
 
   async listTrash(userId: string): Promise<{ id: string; name: string; parentId: string | null; deletedAt: Date }[]> {
@@ -343,6 +276,29 @@ export class FolderService {
       parentId: f.parentId,
       deletedAt: f.deletedAt!,
     }));
+  }
+
+  private async getFolderIdsRecursive(userId: string, rootFolderId: string): Promise<string[]> {
+    const result: string[] = [];
+    const stack = [rootFolderId];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      const folder = await this.prisma.folder.findFirst({
+        where: { id: currentId, userId },
+        select: { id: true },
+      });
+      if (!folder) continue;
+      result.push(folder.id);
+
+      const children = await this.prisma.folder.findMany({
+        where: { userId, parentId: currentId },
+        select: { id: true },
+      });
+      stack.push(...children.map((child) => child.id));
+    }
+
+    return result;
   }
 
   private async isDescendant(
@@ -375,7 +331,7 @@ export class FolderService {
       if (!targetParent) throw new NotFoundError("Target folder not found");
       if (targetParent.userId !== userId) throw new ForbiddenError("Access denied");
 
-      if (await this.isDescendant(folderId, targetParentId, userId)) {
+      if (await this.isDescendant(targetParentId, folderId, userId)) {
         throw new ForbiddenError("Cannot move folder into itself or its descendant");
       }
     }
@@ -452,18 +408,7 @@ export class FolderService {
     });
 
     for (const file of childFiles) {
-      await this.fileRepository.create({
-        userId,
-        folderId: copiedFolder.id,
-        originalName: file.originalName,
-        storedName: file.storedName,
-        path: file.path,
-        mimeType: file.mimeType,
-        category: file.category,
-        size: file.size,
-        hash: file.hash,
-        refCount: file.refCount,
-      });
+      await this.copyFileRecord(userId, file, copiedFolder.id);
     }
 
     const childFolders = await this.folderRepository.findMany({
@@ -504,18 +449,7 @@ export class FolderService {
     });
 
     for (const file of files) {
-      await this.fileRepository.create({
-        userId,
-        folderId: newFolder.id,
-        originalName: file.originalName,
-        storedName: file.storedName,
-        path: file.path,
-        mimeType: file.mimeType,
-        category: file.category,
-        size: file.size,
-        hash: file.hash,
-        refCount: file.refCount,
-      });
+      await this.copyFileRecord(userId, file, newFolder.id);
     }
 
     const children = await this.folderRepository.findMany({
@@ -526,5 +460,24 @@ export class FolderService {
     for (const child of children) {
       await this.copyFolderRecursive(userId, child.id, newFolder.id);
     }
+  }
+
+  private async copyFileRecord(userId: string, file: File, targetFolderId: string): Promise<void> {
+    const blob = file.blobId ? await storageBlobService.addReference(file.blobId) : null;
+    await this.fileRepository.create({
+      userId,
+      folderId: targetFolderId,
+      blobId: file.blobId,
+      originalName: file.originalName,
+      storedName: `${uuidv4()}${file.extension || ""}`,
+      path: blob?.physicalPath || file.path,
+      mimeType: file.mimeType,
+      extension: file.extension,
+      category: file.category,
+      size: file.size,
+      hash: file.hash,
+      refCount: blob?.referenceCount || file.refCount,
+    });
+    await storageAccountingService.recalculateUserUsage(userId);
   }
 }

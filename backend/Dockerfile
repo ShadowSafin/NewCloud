@@ -9,9 +9,10 @@ RUN npm ci
 
 COPY . .
 RUN npx prisma generate
+RUN npm run build
 
 RUN mkdir -p /app/data/storage
 
 EXPOSE 4000
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]

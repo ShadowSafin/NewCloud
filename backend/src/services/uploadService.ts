@@ -2,11 +2,13 @@ import { PrismaClient } from "@prisma/client";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { pipeline } from "stream/promises";
 import { storageService } from "./storageService";
 import { chunkMergeQueue } from "../lib/queues";
 import { BadRequestError, NotFoundError } from "../utils/errors";
 import { UploadRepository } from "../repositories/UploadRepository";
 import { FolderRepository } from "../repositories/FolderRepository";
+import { config } from "../config";
 
 export class UploadService {
   private uploadRepository: UploadRepository;
@@ -18,7 +20,15 @@ export class UploadService {
   }
 
   async initiate(userId: string, filename: string, mimeType: string, totalSize: number, folderId?: string) {
-    const chunkSize = 5 * 1024 * 1024; // 5MB
+    if (!Number.isFinite(totalSize) || totalSize <= 0) {
+      throw new BadRequestError("File size must be greater than zero");
+    }
+
+    if (totalSize > config.maxFileSize) {
+      throw new BadRequestError(`File exceeds maximum size of ${config.maxFileSize} bytes`);
+    }
+
+    const chunkSize = config.uploadChunkSize;
     const totalChunks = Math.ceil(totalSize / chunkSize);
 
     // Validate folder if provided
@@ -48,7 +58,7 @@ export class UploadService {
       chunkData.push({
         sessionId: session.id,
         chunkIndex: i,
-        path: path.join(uploadDir, `${session.id}_chunk_${i}`),
+        path: path.join(uploadDir, "chunks", session.id, `${i}.chunk`),
         size: BigInt(i < totalChunks - 1 ? chunkSize : totalSize - (chunkSize * (totalChunks - 1))),
         uploaded: false,
       });
@@ -65,11 +75,12 @@ export class UploadService {
     };
   }
 
-  async uploadChunk(
+  async uploadChunkFromFile(
     userId: string,
     sessionId: string,
     chunkIndex: number,
-    data: Buffer,
+    tempPath: string,
+    actualSize: bigint,
     hash?: string
   ) {
     const session = await this.uploadRepository.findSessionWithChunks(sessionId);
@@ -82,23 +93,32 @@ export class UploadService {
 
     const chunk = session.chunks.find((c) => c.chunkIndex === chunkIndex);
     if (!chunk) throw new NotFoundError("Chunk not found");
-
-    // Stream-based write to disk
-    const writeStream = fs.createWriteStream(chunk.path);
-    writeStream.write(data);
-    writeStream.end();
-
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-    });
+    if (actualSize !== chunk.size) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+      throw new BadRequestError(`Invalid chunk size. Expected ${chunk.size.toString()} bytes`);
+    }
 
     // Verify hash if provided
     if (hash) {
-      const computedHash = crypto.createHash("sha256").update(data).digest("hex");
+      const computedHash = await this.computeHash(tempPath);
       if (computedHash !== hash) {
+        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
         throw new BadRequestError("Chunk hash mismatch - data corrupted");
       }
+    }
+
+    if (!storageService.isSafePath(userId, chunk.path)) {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+      throw new BadRequestError("Invalid chunk path");
+    }
+
+    await fs.promises.mkdir(path.dirname(chunk.path), { recursive: true });
+    try {
+      await fs.promises.rename(tempPath, chunk.path);
+    } catch (error: any) {
+      if (error?.code !== "EXDEV") throw error;
+      await pipeline(fs.createReadStream(tempPath), fs.createWriteStream(chunk.path));
+      await fs.promises.unlink(tempPath).catch(() => {});
     }
 
     // Mark chunk as uploaded
@@ -178,6 +198,7 @@ export class UploadService {
       progress: session.totalChunks > 0 ? session.uploadedChunks / session.totalChunks : 0,
       uploadedChunks: session.uploadedChunks,
       totalChunks: session.totalChunks,
+      fileId: session.fileId,
       chunks: session.chunks.map((c) => ({
         chunkIndex: c.chunkIndex,
         uploaded: c.uploaded,
@@ -204,5 +225,15 @@ export class UploadService {
       pendingChunks: session.chunks.map((c) => c.chunkIndex),
       chunkSize: session.chunkSize,
     };
+  }
+
+  private async computeHash(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash("sha256");
+      const stream = fs.createReadStream(filePath);
+      stream.on("data", (data) => hash.update(data));
+      stream.on("end", () => resolve(hash.digest("hex")));
+      stream.on("error", reject);
+    });
   }
 }

@@ -103,7 +103,12 @@ function FolderTreeItem({
   );
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -140,6 +145,7 @@ export function Sidebar() {
   const handleFolderSelect = (folderId: string) => {
     setCurrentFolder(folderId);
     router.push("/");
+    if (onClose) onClose();
   };
 
   const handleNavClick = (href: string) => {
@@ -147,6 +153,7 @@ export function Sidebar() {
     if (href === "/") {
       setCurrentFolder(null);
     }
+    if (onClose) onClose();
   };
 
   const isActive = (href: string) => {
@@ -159,112 +166,128 @@ export function Sidebar() {
   const usedPercent = storageTotal > 0 ? Math.min((storageUsed / storageTotal) * 100, 100) : 0;
 
   return (
-    <aside className="w-56 h-full border-r border-white/[0.06] bg-black/15 flex flex-col shrink-0">
-      {/* Quick Access */}
-      <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
-        <div className="space-y-1">
-          {navItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <button
-                key={item.label}
-                onClick={() => handleNavClick(item.href)}
-                className={cn(
-                  "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-all duration-200",
-                  active
-                    ? "bg-white/[0.04] text-white font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                    : "text-white/60 hover:text-white hover:bg-white/[0.02]"
-                )}
-              >
-                {/* Cyan active dot on left */}
-                <span className={cn(
-                  "w-1.5 h-1.5 rounded-full mr-2.5 transition-all duration-300",
-                  active ? "bg-cyan-400 glow-cyan scale-100" : "bg-transparent scale-0"
-                )} />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+    <>
+      {/* Backdrop overlay on mobile when drawer is open */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
 
-        {/* Folder Tree */}
-        <div className="border-t border-white/[0.06] pt-4 mt-4">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-white/35 mb-2 px-2">
-            Folders
+      <aside 
+        className={cn(
+          "w-56 h-full border-r border-white/[0.06] bg-[#090616]/98 md:bg-black/15 flex flex-col shrink-0 transition-transform duration-300 ease-in-out z-50",
+          "fixed inset-y-0 left-0 md:relative md:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Quick Access */}
+        <div className="p-4 space-y-1.5 flex-1 overflow-y-auto no-scrollbar">
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => handleNavClick(item.href)}
+                  className={cn(
+                    "w-full flex items-center px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                    active
+                      ? "bg-white/[0.04] text-white font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                      : "text-white/60 hover:text-white hover:bg-white/[0.02]"
+                  )}
+                >
+                  {/* Cyan active dot on left */}
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full mr-2.5 transition-all duration-300",
+                    active ? "bg-cyan-400 glow-cyan scale-100" : "bg-transparent scale-0"
+                  )} />
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
-          {localTree.length > 0 ? (
-            <div className="space-y-0.5">
-              <button
-                onClick={() => { setCurrentFolder(null); router.push("/"); }}
-                className={cn(
-                  "w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors",
-                  currentFolderId === null 
-                    ? "bg-white/[0.04] text-white font-medium" 
-                    : "text-white/60 hover:text-white hover:bg-white/[0.02]"
-                )}
-              >
-                <Folder className="w-3.5 h-3.5 text-cyan-400/80" />
-                <span>All Files</span>
-              </button>
-              {localTree.map((node) => (
-                <FolderTreeItem
-                  key={node.id}
-                  node={node}
-                  level={0}
-                  currentFolderId={currentFolderId}
-                  onSelect={handleFolderSelect}
-                />
-              ))}
+
+          {/* Folder Tree */}
+          <div className="border-t border-white/[0.06] pt-4 mt-4">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-white/35 mb-2 px-2">
+              Folders
             </div>
-          ) : (
-            <p className="text-[10px] text-white/40 px-2 py-1 italic">No subfolders</p>
-          )}
-        </div>
-      </div>
-
-      {/* Bottom Section: Storage */}
-      <div className="p-4 border-t border-white/[0.06] space-y-3">
-        <div className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-3 backdrop-blur-md shadow-sm">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-white/35">Storage</span>
-            <span className="text-[10px] font-semibold text-white/70">
-              {formatBytes(storageUsed)} / {formatBytes(storageTotal)}
-            </span>
-          </div>
-
-          <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 glow-cyan transition-all duration-500"
-              style={{ width: `${usedPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* User profile & Settings */}
-        <div className="flex flex-col gap-1.5">
-          <button
-            onClick={() => router.push("/settings")}
-            className={cn(
-              "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs transition-all duration-200",
-              pathname === "/settings"
-                ? "bg-white/[0.04] text-white font-medium"
-                : "text-white/50 hover:text-white hover:bg-white/[0.02]"
+            {localTree.length > 0 ? (
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => { setCurrentFolder(null); router.push("/"); if (onClose) onClose(); }}
+                  className={cn(
+                    "w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors",
+                    currentFolderId === null 
+                      ? "bg-white/[0.04] text-white font-medium" 
+                      : "text-white/60 hover:text-white hover:bg-white/[0.02]"
+                  )}
+                >
+                  <Folder className="w-3.5 h-3.5 text-cyan-400/80" />
+                  <span>All Files</span>
+                </button>
+                {localTree.map((node) => (
+                  <FolderTreeItem
+                    key={node.id}
+                    node={node}
+                    level={0}
+                    currentFolderId={currentFolderId}
+                    onSelect={handleFolderSelect}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-white/40 px-2 py-1 italic">No subfolders</p>
             )}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            Settings
-          </button>
-          
-          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-white/[0.01]">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-[10px] text-white font-semibold">
-              {user?.username?.[0]?.toUpperCase() || "U"}
+          </div>
+        </div>
+
+        {/* Bottom Section: Storage */}
+        <div className="p-4 border-t border-white/[0.06] space-y-3 safe-pb">
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.04] p-3 backdrop-blur-md shadow-sm">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-white/35">Storage</span>
+              <span className="text-[10px] font-semibold text-white/70">
+                {formatBytes(storageUsed)} / {formatBytes(storageTotal)}
+              </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-white/80 font-medium truncate">{user?.username || "User"}</p>
+
+            <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 glow-cyan transition-all duration-500"
+                style={{ width: `${usedPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* User profile & Settings */}
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => { router.push("/settings"); if (onClose) onClose(); }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs transition-all duration-200",
+                pathname === "/settings"
+                  ? "bg-white/[0.04] text-white font-medium"
+                  : "text-white/50 hover:text-white hover:bg-white/[0.02]"
+              )}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Settings
+            </button>
+            
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-white/[0.01]">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-[10px] text-white font-semibold">
+                {user?.username?.[0]?.toUpperCase() || "U"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/80 font-medium truncate">{user?.username || "User"}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

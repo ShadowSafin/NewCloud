@@ -1,36 +1,78 @@
-import { motion } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { Github, HardDrive } from "lucide-react";
 
 export function Nav() {
+  const { scrollYProgress } = useScroll();
+  const smoothScroll = useSpring(scrollYProgress, {
+    stiffness: 90,
+    damping: 24,
+    mass: 0.35,
+  });
+  const maxWidth = useTransform(smoothScroll, [0, 0.16], ["72rem", "54rem"]);
+  const y = useTransform(smoothScroll, [0, 0.16], [0, -2]);
+  const backgroundColor = useTransform(
+    smoothScroll,
+    [0, 0.16],
+    ["rgba(7, 10, 24, 0.28)", "rgba(7, 10, 24, 0.62)"]
+  );
+  const borderColor = useTransform(
+    smoothScroll,
+    [0, 0.16],
+    ["rgba(255, 255, 255, 0.08)", "rgba(255, 255, 255, 0.16)"]
+  );
+  const backdropFilter = useTransform(
+    smoothScroll,
+    [0, 0.16],
+    ["blur(18px) saturate(145%)", "blur(30px) saturate(180%)"]
+  );
+  const boxShadow = useTransform(
+    smoothScroll,
+    [0, 0.16],
+    [
+      "0 18px 60px -28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)",
+      "0 24px 80px -30px rgba(0,0,0,0.72), 0 0 48px rgba(83,175,255,0.08), inset 0 1px 0 rgba(255,255,255,0.08)",
+    ]
+  );
+
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="fixed top-4 left-4 right-4 z-50 mx-auto max-w-full"
+      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      style={{ maxWidth, y }}
+      className="fixed left-4 right-4 top-4 z-50 mx-auto"
     >
-      <div className="apex-glass flex items-center justify-between rounded-full px-3 py-2 apex-shadow-card">
+      <motion.div
+        style={{
+          backgroundColor,
+          borderColor,
+          backdropFilter,
+          WebkitBackdropFilter: backdropFilter,
+          boxShadow,
+        }}
+        className="flex items-center justify-between rounded-full border px-3 py-2"
+      >
         <a href="/" className="flex items-center gap-2 pl-2">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--gradient-brand)] apex-shadow-glow">
             <HardDrive className="h-4 w-4 text-background" strokeWidth={2.5} />
           </div>
-          <span className="font-display text-lg font-semibold tracking-tight">NewCloud</span>
+          <span className="font-display text-lg font-semibold">NewCloud</span>
         </a>
-        <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
-          <a className="hover:text-foreground transition" href="#features">Features</a>
-          <a className="hover:text-foreground transition" href="#self-host">Self-host</a>
-          <a className="hover:text-foreground transition" href="#pricing">Pricing</a>
-          <a className="hover:text-foreground transition" href="#faq">FAQ</a>
+        <nav className="hidden items-center gap-7 text-sm text-white/62 md:flex">
+          <a className="transition hover:text-white" href="#features">Features</a>
+          <a className="transition hover:text-white" href="#self-host">Self-host</a>
+          <a className="transition hover:text-white" href="#pricing">Pricing</a>
+          <a className="transition hover:text-white" href="#faq">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
-          <a href="https://github.com/ShadowSafin/NewCloud" target="_blank" rel="noopener noreferrer" className="hidden sm:inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition">
+          <a href="https://github.com/ShadowSafin/NewCloud" target="_blank" rel="noopener noreferrer" className="hidden items-center gap-2 rounded-full px-3 py-1.5 text-sm text-white/62 transition hover:text-white sm:inline-flex">
             <Github className="h-4 w-4" /> GitHub
           </a>
-          <a href="/register" className="inline-flex items-center rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-medium text-background apex-shadow-glow hover:opacity-90 transition">
+          <a href="/register" className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-950 shadow-[0_0_28px_rgba(130,220,255,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_0_40px_rgba(130,220,255,0.35)]">
             Get Started
           </a>
         </div>
-      </div>
+      </motion.div>
     </motion.header>
   );
 }
