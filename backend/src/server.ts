@@ -277,7 +277,7 @@ async function initializeAndListen(): Promise<void> {
     }
     const diskStats = await storageService.getDiskStats();
     console.log(`Storage health check: OK`);
-    console.log(`Available space: ${(diskStats.freeDisk / 1024 / 1024 / 1024).toFixed(2)} GB`);
+    console.log(`Available space: ${(diskStats.availableDisk / 1024 / 1024 / 1024).toFixed(2)} GB`);
   } catch (error) {
     console.error("Storage initialization failed:", error);
     throw error;

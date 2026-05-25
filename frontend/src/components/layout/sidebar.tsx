@@ -117,21 +117,42 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const { currentFolderId, setCurrentFolder } = useFileStore();
 
   const [storageUsed, setStorageUsed] = useState(0);
+  const [storageAvailable, setStorageAvailable] = useState(0);
   const [storageTotal, setStorageTotal] = useState(0);
   const [trashSize, setTrashSize] = useState(0);
   const [fileCount, setFileCount] = useState(0);
   const [localTree, setLocalTree] = useState<FolderNode[]>([]);
 
   useEffect(() => {
-    filesApi.storage()
-      .then((res) => {
-        const d = res.data.data;
-        setStorageUsed(d.used);
-        setStorageTotal(d.totalDisk);
-        setFileCount(d.fileCount);
-        setTrashSize(d.trashSize || 0);
-      })
-      .catch(() => {});
+    let isActive = true;
+    const loadStorage = () => {
+      filesApi.storage()
+        .then((res) => {
+          if (!isActive) return;
+          const d = res.data.data;
+          setStorageUsed(d.used);
+          setStorageAvailable(d.availableDisk ?? d.freeDisk ?? 0);
+          setStorageTotal(d.totalDisk ?? 0);
+          setFileCount(d.fileCount);
+          setTrashSize(d.trashSize || 0);
+        })
+        .catch(() => {});
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadStorage();
+      }
+    };
+
+    loadStorage();
+    const intervalId = window.setInterval(loadStorage, 30_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -163,7 +184,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     return viewParam === currentView || (!viewParam && !currentView && href === "/");
   };
 
-  const usedPercent = storageTotal > 0 ? Math.min((storageUsed / storageTotal) * 100, 100) : 0;
+  const usableCapacity = storageUsed + storageAvailable;
+  const usedPercent = usableCapacity > 0 ? Math.min((storageUsed / usableCapacity) * 100, 100) : 0;
 
   return (
     <>
@@ -250,7 +272,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] uppercase font-bold tracking-wider text-white/35">Storage</span>
               <span className="text-[10px] font-semibold text-white/70">
-                {formatBytes(storageUsed)} / {formatBytes(storageTotal)}
+                {formatBytes(storageUsed)} used
               </span>
             </div>
 
@@ -259,6 +281,10 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 glow-cyan transition-all duration-500"
                 style={{ width: `${usedPercent}%` }}
               />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-white/45">
+              <span>{formatBytes(storageAvailable)} available</span>
+              <span>{formatBytes(storageTotal)} total</span>
             </div>
           </div>
 

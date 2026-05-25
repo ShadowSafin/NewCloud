@@ -36,6 +36,7 @@ router.get("/storage", authenticate, asyncHandler(async (req: any, res: any) => 
       fileCount: userStats.fileCount,
       totalDisk: diskStats.totalDisk,
       freeDisk: diskStats.freeDisk,
+      availableDisk: diskStats.availableDisk,
       trashSize: storageInfo.trashSize,
     },
   });

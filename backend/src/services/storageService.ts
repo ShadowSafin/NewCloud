@@ -140,15 +140,17 @@ export class StorageService {
     return stats;
   }
 
-  async getDiskStats(): Promise<{ totalDisk: number; freeDisk: number }> {
+  async getDiskStats(): Promise<{ totalDisk: number; freeDisk: number; availableDisk: number }> {
     try {
       const stats = await fs.promises.statfs(this.rootPath);
+      const availableBlocks = stats.bavail ?? stats.bfree;
       return {
         totalDisk: stats.bsize * stats.blocks,
         freeDisk: stats.bsize * stats.bfree,
+        availableDisk: stats.bsize * availableBlocks,
       };
     } catch {
-      return { totalDisk: 0, freeDisk: 0 };
+      return { totalDisk: 0, freeDisk: 0, availableDisk: 0 };
     }
   }
 

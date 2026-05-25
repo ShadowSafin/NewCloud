@@ -55,8 +55,8 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
 
   const [storageUsed, setStorageUsed] = useState(0);
+  const [storageAvailable, setStorageAvailable] = useState(0);
   const [storageTotal, setStorageTotal] = useState(0);
-  const [storageFree, setStorageFree] = useState(0);
   const [fileCount, setFileCount] = useState(0);
 
   const [networkStatus, setNetworkStatus] = useState<any>(null);
@@ -77,15 +77,28 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      filesApi.storage()
-        .then((res) => {
-          const d = res.data.data;
-          setStorageUsed(d.used);
-          setStorageTotal(d.totalDisk);
-          setStorageFree(d.freeDisk);
-          setFileCount(d.fileCount);
-        })
-        .catch(() => {});
+      let isActive = true;
+      const loadStorage = () => {
+        filesApi.storage()
+          .then((res) => {
+            if (!isActive) return;
+            const d = res.data.data;
+            setStorageUsed(d.used);
+            setStorageAvailable(d.availableDisk ?? d.freeDisk ?? 0);
+            setStorageTotal(d.totalDisk ?? 0);
+            setFileCount(d.fileCount);
+          })
+          .catch(() => {});
+      };
+      const refreshWhenVisible = () => {
+        if (document.visibilityState === "visible") {
+          loadStorage();
+        }
+      };
+
+      loadStorage();
+      const storageIntervalId = window.setInterval(loadStorage, 30_000);
+      document.addEventListener("visibilitychange", refreshWhenVisible);
 
       apiClient.get("/network/status")
         .then((res) => {
@@ -105,6 +118,12 @@ export default function SettingsPage() {
           }).catch(err => console.error("QR Code generation failed:", err));
         })
         .catch(() => {});
+
+      return () => {
+        isActive = false;
+        window.clearInterval(storageIntervalId);
+        document.removeEventListener("visibilitychange", refreshWhenVisible);
+      };
     }
   }, [isAuthenticated]);
 
@@ -132,7 +151,8 @@ export default function SettingsPage() {
 
   if (!isAuthenticated || !user) return null;
 
-  const usedPercent = storageTotal > 0 ? Math.min((storageUsed / storageTotal) * 100, 100) : 0;
+  const usableCapacity = storageUsed + storageAvailable;
+  const usedPercent = usableCapacity > 0 ? Math.min((storageUsed / usableCapacity) * 100, 100) : 0;
 
   return (
     <AppShell>
@@ -202,7 +222,7 @@ export default function SettingsPage() {
             {/* Usage bar */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-body-mid">Your usage</span>
+                <span className="text-xs text-body-mid">NexxCloud usage</span>
                 <span className="text-xs text-body-mid font-mono">{usedPercent.toFixed(1)}%</span>
               </div>
               <div className="h-2 bg-canvas-mid rounded-full overflow-hidden">
@@ -217,14 +237,18 @@ export default function SettingsPage() {
             </div>
 
             {/* Stats grid */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="p-4 bg-canvas-soft border border-hairline rounded-sm">
                 <p className="text-xs text-body-mid mb-1">Used</p>
                 <p className="text-lg text-ink font-mono">{formatBytes(storageUsed)}</p>
               </div>
               <div className="p-4 bg-canvas-soft border border-hairline rounded-sm">
-                <p className="text-xs text-body-mid mb-1">Free</p>
-                <p className="text-lg text-ink font-mono">{formatBytes(storageFree)}</p>
+                <p className="text-xs text-body-mid mb-1">Available</p>
+                <p className="text-lg text-ink font-mono">{formatBytes(storageAvailable)}</p>
+              </div>
+              <div className="p-4 bg-canvas-soft border border-hairline rounded-sm">
+                <p className="text-xs text-body-mid mb-1">Total Disk</p>
+                <p className="text-lg text-ink font-mono">{formatBytes(storageTotal)}</p>
               </div>
               <div className="p-4 bg-canvas-soft border border-hairline rounded-sm">
                 <p className="text-xs text-body-mid mb-1">Files</p>
@@ -232,12 +256,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 p-4 bg-canvas-soft border border-hairline rounded-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-body-mid">Total Disk Space</span>
-                <span className="text-sm text-ink font-mono">{formatBytes(storageTotal)}</span>
-              </div>
-            </div>
+            <p className="mt-4 text-xs text-body-mid">
+              Available and total disk space are read directly from the configured storage volume.
+            </p>
           </div>
 
           {/* Network Access (LAN) */}
