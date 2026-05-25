@@ -122,7 +122,7 @@ export function FolderCard({
   return (
     <div
       className={cn(
-        "group relative rounded-2xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none h-full flex flex-col justify-between overflow-hidden",
+        "group relative rounded-xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none h-full flex flex-col justify-between overflow-hidden",
         isDropTarget ? "border-cyan-400 bg-cyan-500/10 shadow-[0_0_20px_rgba(34,211,238,0.25)]" : isSelectedFinal ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.2)]" : "",
       )}
       onClick={handleClick}
@@ -137,22 +137,22 @@ export function FolderCard({
       {/* 3-dot menu */}
       <button
         onClick={(e) => { e.stopPropagation(); handleContextMenu(e as any); }}
-        className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] hover:border-white/[0.15] transition-all"
+        className="absolute top-2 right-2 z-10 p-1 rounded-md bg-white/[0.03] border border-white/[0.05] opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] hover:border-white/[0.15] transition-all"
       >
         <MoreVertical className="w-3.5 h-3.5 text-white/60" />
       </button>
 
       {/* Folder Icon with ambient glow container */}
-      <div className="flex-1 flex items-center justify-center p-6 min-h-0 relative">
+      <div className="flex-1 flex items-center justify-center p-3 min-h-0 relative">
         <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 to-transparent blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-        <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] group-hover:scale-110 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_25px_rgba(6,182,212,0.15)] transition-all duration-300">
-          <Folder className="w-12 h-12 text-cyan-400 glow-cyan" />
+        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] group-hover:scale-110 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_25px_rgba(6,182,212,0.15)] transition-all duration-300">
+          <Folder className="w-9 h-9 text-cyan-400 glow-cyan" />
         </div>
       </div>
 
       {/* Info Section */}
-      <div className="px-4 pb-4 pt-2 shrink-0 bg-black/10 border-t border-white/[0.02]">
-        <p className="text-sm font-semibold text-white/90 group-hover:text-white truncate mb-0.5">{folder.name}</p>
+      <div className="px-3 pb-2.5 pt-1.5 shrink-0 bg-black/10 border-t border-white/[0.02]">
+        <p className="text-xs font-semibold text-white/90 group-hover:text-white truncate mb-0.5">{folder.name}</p>
         <p className="text-[10px] text-white/40 font-mono">{formatDate(folder.createdAt)}</p>
       </div>
 

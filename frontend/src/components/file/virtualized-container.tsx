@@ -46,7 +46,7 @@ export function VirtualizedContainer<T>({
     };
   }, []);
 
-  const gap = 12; // gap-3 in pixels
+  const gap = 10;
 
   const { cols, itemHeight } = useMemo(() => {
     if (viewMode === "list") {
@@ -54,11 +54,13 @@ export function VirtualizedContainer<T>({
     }
 
     let gridColumns: number;
-    if (containerWidth >= 1024) gridColumns = 5;
-    else if (containerWidth >= 768) gridColumns = 4;
-    else if (containerWidth >= 640) gridColumns = 3;
+    if (containerWidth >= 1440) gridColumns = 8;
+    else if (containerWidth >= 1180) gridColumns = 7;
+    else if (containerWidth >= 960) gridColumns = 6;
+    else if (containerWidth >= 760) gridColumns = 5;
+    else if (containerWidth >= 580) gridColumns = 4;
     else {
-      const minCardWidth = containerWidth < 380 ? 138 : 150;
+      const minCardWidth = containerWidth < 380 ? 136 : 148;
       const derivedCols = Math.max(1, Math.floor((containerWidth + gap) / (minCardWidth + gap)));
       gridColumns = Math.min(2, derivedCols);
     }

@@ -205,7 +205,7 @@ export function FileCard({
     return (
       <div
         className={cn(
-          "group relative rounded-2xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none h-full flex flex-col justify-between overflow-hidden",
+          "group relative rounded-xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none h-full flex flex-col justify-between overflow-hidden",
           isSelected ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.2)]" : "",
         )}
         onClick={handleClick}
@@ -215,7 +215,7 @@ export function FileCard({
         onDragStart={handleDragStart}
       >
         {/* Checkbox */}
-        <div className="absolute top-3 left-3 z-10">
+        <div className="absolute top-2 left-2 z-10">
           <div
             className={cn(
               "w-4 h-4 rounded-md border flex items-center justify-center transition-all duration-150",
@@ -231,20 +231,20 @@ export function FileCard({
         </div>
 
         {/* Favorite star */}
-        <button onClick={toggleFavorite} className="absolute top-3 right-9 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={toggleFavorite} className="absolute top-2.5 right-8 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
           <Star className={cn("w-3.5 h-3.5", isFavorite ? "fill-yellow-400 text-yellow-400 opacity-100 animate-pulse" : "text-white/40 hover:text-white")} />
         </button>
 
         {/* 3-dot menu */}
         <button
           onClick={(e) => { e.stopPropagation(); handleContextMenu(e); }}
-          className="absolute top-2.5 right-2.5 z-10 p-1 rounded-lg bg-white/[0.03] border border-white/[0.05] opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] hover:border-white/[0.15] transition-all"
+          className="absolute top-2 right-2 z-10 p-1 rounded-md bg-white/[0.03] border border-white/[0.05] opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] hover:border-white/[0.15] transition-all"
         >
           <MoreVertical className="w-3.5 h-3.5 text-white/60" />
         </button>
 
         {/* Thumbnail or Icon Container */}
-        <div className="flex-1 relative m-3.5 min-h-0 rounded-xl overflow-hidden bg-black/25 border border-white/[0.03] flex items-center justify-center">
+        <div className="flex-1 relative m-2.5 min-h-0 rounded-lg overflow-hidden bg-black/25 border border-white/[0.03] flex items-center justify-center">
           {thumbnailUrl ? (
             <img
               src={thumbnailUrl}
@@ -255,14 +255,14 @@ export function FileCard({
           ) : (
             <div className={cn("w-full h-full flex items-center justify-center transition-all duration-300 relative", catColor.iconBg)}>
               <div className="absolute inset-0 bg-gradient-to-tr from-white/[0.01] to-transparent pointer-events-none" />
-              <Icon className={cn("w-10 h-10 transition-transform duration-300 group-hover:scale-110", catColor.text, catColor.glow)} />
+              <Icon className={cn("w-8 h-8 transition-transform duration-300 group-hover:scale-110", catColor.text, catColor.glow)} />
             </div>
           )}
         </div>
 
         {/* Info */}
-        <div className="px-4 pb-4 pt-1 shrink-0 bg-black/10 border-t border-white/[0.02]">
-          <p className="text-sm font-semibold text-white/90 group-hover:text-white truncate mb-0.5" title={file.originalName}>{file.originalName}</p>
+        <div className="px-3 pb-2.5 pt-1.5 shrink-0 bg-black/10 border-t border-white/[0.02]">
+          <p className="text-xs font-semibold text-white/90 group-hover:text-white truncate mb-0.5" title={file.originalName}>{file.originalName}</p>
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-white/40 font-mono">{formatFileSize(file.size)}</p>
             {(file as any).refCount > 1 && (

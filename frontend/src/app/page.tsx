@@ -725,7 +725,7 @@ function DashboardContent() {
             <div
               className={
                 store.viewMode === "grid"
-                  ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+                  ? "grid grid-cols-2 min-[580px]:grid-cols-4 min-[760px]:grid-cols-5 min-[960px]:grid-cols-6 min-[1180px]:grid-cols-7 min-[1440px]:grid-cols-8 gap-[10px]"
                   : "flex flex-col gap-1"
               }
             >
