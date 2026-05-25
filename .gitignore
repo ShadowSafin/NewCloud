@@ -60,3 +60,8 @@ prisma/migrations/*/migration_lock.toml
 *.jks
 *.keystore
 **/keystore.properties
+
+# Local workspace instructions and exported mobile packages
+/AGENTS.md
+/*.apk
+/*.aab
