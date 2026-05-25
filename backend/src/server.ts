@@ -167,7 +167,7 @@ app.use(requestLogger);
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ 
     status: "ok", 
-    name: "NewCloud", 
+    name: "NexxCloud",
     version: "1.0.0",
     timestamp: new Date().toISOString() 
   });
@@ -177,7 +177,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ 
     status: "ok", 
-    name: "NewCloud", 
+    name: "NexxCloud",
     version: "1.0.0" 
   });
 });
@@ -189,7 +189,7 @@ app.get("/health/ready", asyncHandler(async (_req: Request, res: Response) => {
 
   res.json({
     status: "ready",
-    name: "NewCloud",
+    name: "NexxCloud",
     dependencies: {
       database: "ok",
       redis: "ok",
@@ -291,7 +291,7 @@ async function initializeAndListen(): Promise<void> {
 }
 
 void initializeAndListen().catch(async (error) => {
-  console.error("Startup failed. NewCloud will not accept traffic:", error);
+  console.error("Startup failed. NexxCloud will not accept traffic:", error);
   await prisma.$disconnect().catch(() => {});
   process.exit(1);
 });

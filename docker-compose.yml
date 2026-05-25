@@ -1,19 +1,19 @@
-name: ${COMPOSE_PROJECT_NAME:-newcloud}
+name: ${COMPOSE_PROJECT_NAME:-nexxcloud}
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-newcloud}
+      POSTGRES_USER: ${DB_USER:-nexxcloud}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-newcloud}
+      POSTGRES_DB: ${DB_NAME:-nexxcloud}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-newcloud} -d ${DB_NAME:-newcloud}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-nexxcloud} -d ${DB_NAME:-nexxcloud}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -44,7 +44,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
       DB_PASSWORD: ${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}
-      DATABASE_URL: postgresql://${DB_USER:-newcloud}:${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}@postgres:5432/${DB_NAME:-newcloud}?schema=public
+      DATABASE_URL: postgresql://${DB_USER:-nexxcloud}:${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}@postgres:5432/${DB_NAME:-nexxcloud}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?Run setup.sh/setup.bat first or set JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Run setup.sh/setup.bat first or set JWT_REFRESH_SECRET}
@@ -70,7 +70,7 @@ services:
       HOST_LAN_IP: ${HOST_LAN_IP:-}
       HOST_HOSTNAME: ${HOST_HOSTNAME:-}
     volumes:
-      - ${NEWCLOUD_DATA_DIR:-./data}:/app/data
+      - ${NEXXCLOUD_DATA_DIR:-${NEWCLOUD_DATA_DIR:-./data}}:/app/data
     ports:
       - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT:-4000}:4000"
     networks:
@@ -130,7 +130,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       DB_PASSWORD: ${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}
-      DATABASE_URL: postgresql://${DB_USER:-newcloud}:${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}@postgres:5432/${DB_NAME:-newcloud}?schema=public
+      DATABASE_URL: postgresql://${DB_USER:-nexxcloud}:${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}@postgres:5432/${DB_NAME:-nexxcloud}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?Run setup.sh/setup.bat first or set JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Run setup.sh/setup.bat first or set JWT_REFRESH_SECRET}
@@ -146,7 +146,7 @@ services:
       BULL_BOARD_USERNAME: ${BULL_BOARD_USERNAME:-admin}
       BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:?Run setup.sh/setup.bat first or set BULL_BOARD_PASSWORD}
     volumes:
-      - ${NEWCLOUD_DATA_DIR:-./data}:/app/data
+      - ${NEXXCLOUD_DATA_DIR:-${NEWCLOUD_DATA_DIR:-./data}}:/app/data
     networks:
       - data
     depends_on:
@@ -165,13 +165,13 @@ services:
 
 volumes:
   postgres_data:
-    name: ${COMPOSE_PROJECT_NAME:-newcloud}_postgres_data
+    name: ${COMPOSE_PROJECT_NAME:-nexxcloud}_postgres_data
   redis_data:
-    name: ${COMPOSE_PROJECT_NAME:-newcloud}_redis_data
+    name: ${COMPOSE_PROJECT_NAME:-nexxcloud}_redis_data
 
 networks:
   web:
-    name: ${COMPOSE_PROJECT_NAME:-newcloud}_web
+    name: ${COMPOSE_PROJECT_NAME:-nexxcloud}_web
   data:
-    name: ${COMPOSE_PROJECT_NAME:-newcloud}_data
+    name: ${COMPOSE_PROJECT_NAME:-nexxcloud}_data
     internal: true

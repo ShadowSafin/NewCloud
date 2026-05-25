@@ -5,12 +5,12 @@ $ErrorActionPreference = "Stop"
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $EnvFile = Join-Path $RootDir ".env"
 
-function Write-NewCloudInfo([string] $Message) {
-    Write-Host "[NewCloud] $Message" -ForegroundColor Cyan
+function Write-NexxCloudInfo([string] $Message) {
+    Write-Host "[NexxCloud] $Message" -ForegroundColor Cyan
 }
 
-function Throw-NewCloudError([string] $Message) {
-    throw "[NewCloud] $Message"
+function Throw-NexxCloudError([string] $Message) {
+    throw "[NexxCloud] $Message"
 }
 
 function New-SecureHex {
@@ -56,7 +56,7 @@ function Generate-PlaceholderSecret([string] $Key) {
         $value -eq "GENERATE_WITH_SETUP" -or
         $value -eq "replace-with-at-least-32-random-characters") {
         Set-EnvValue $Key (New-SecureHex)
-        Write-NewCloudInfo "Generated $Key."
+        Write-NexxCloudInfo "Generated $Key."
     }
 }
 
@@ -79,7 +79,7 @@ function Assert-PortAvailable([string] $Port) {
     if (-not $Port) { return }
     $listener = Get-NetTCPConnection -State Listen -LocalPort ([int]$Port) -ErrorAction SilentlyContinue
     if ($listener) {
-        Throw-NewCloudError "Port $Port is already in use. Change FRONTEND_PORT/BACKEND_PORT in .env or stop the existing service."
+        Throw-NexxCloudError "Port $Port is already in use. Change FRONTEND_PORT/BACKEND_PORT in .env or stop the existing service."
     }
 }
 
@@ -90,33 +90,33 @@ function Resolve-InitialPort([string] $EnvironmentKey, [string] $DefaultPort) {
     }
     $parsed = 0
     if (-not [int]::TryParse($value, [ref]$parsed) -or $parsed -lt 1 -or $parsed -gt 65535) {
-        Throw-NewCloudError "$EnvironmentKey must be a port number from 1 through 65535."
+        Throw-NexxCloudError "$EnvironmentKey must be a port number from 1 through 65535."
     }
     return $value
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Throw-NewCloudError "Docker is not installed. Install Docker Desktop and run setup again."
+    Throw-NexxCloudError "Docker is not installed. Install Docker Desktop and run setup again."
 }
 docker compose version *> $null
 if ($LASTEXITCODE -ne 0) {
-    Throw-NewCloudError "Docker Compose v2 is required."
+    Throw-NexxCloudError "Docker Compose v2 is required."
 }
 docker info *> $null
 if ($LASTEXITCODE -ne 0) {
-    Throw-NewCloudError "Docker Desktop is installed but is not running."
+    Throw-NexxCloudError "Docker Desktop is installed but is not running."
 }
 
 $lanIp = Find-LanIp
 $hostName = $env:COMPUTERNAME
-if (-not $hostName) { $hostName = "newcloud" }
-$composeProjectName = if ($env:NEWCLOUD_PROJECT_NAME) { $env:NEWCLOUD_PROJECT_NAME } else { "newcloud" }
+if (-not $hostName) { $hostName = "nexxcloud" }
+$composeProjectName = if ($env:NEXXCLOUD_PROJECT_NAME) { $env:NEXXCLOUD_PROJECT_NAME } else { "nexxcloud" }
 if ($composeProjectName -notmatch "^[a-z0-9][a-z0-9_-]*$") {
-    Throw-NewCloudError "NEWCLOUD_PROJECT_NAME may contain only lowercase letters, digits, underscores, and hyphens."
+    Throw-NexxCloudError "NEXXCLOUD_PROJECT_NAME may contain only lowercase letters, digits, underscores, and hyphens."
 }
-$initialFrontendPort = Resolve-InitialPort "NEWCLOUD_FRONTEND_PORT" "3000"
-$initialBackendPort = Resolve-InitialPort "NEWCLOUD_BACKEND_PORT" "4000"
-$initialDataDir = if ($env:NEWCLOUD_DATA_DIR) { $env:NEWCLOUD_DATA_DIR } else { "./data" }
+$initialFrontendPort = Resolve-InitialPort "NEXXCLOUD_FRONTEND_PORT" "3000"
+$initialBackendPort = Resolve-InitialPort "NEXXCLOUD_BACKEND_PORT" "4000"
+$initialDataDir = if ($env:NEXXCLOUD_DATA_DIR) { $env:NEXXCLOUD_DATA_DIR } else { "./data" }
 
 if (-not (Test-Path $EnvFile)) {
     $content = @"
@@ -127,11 +127,11 @@ FRONTEND_PORT=$initialFrontendPort
 BACKEND_PORT=$initialBackendPort
 FRONTEND_BIND_ADDRESS=0.0.0.0
 BACKEND_BIND_ADDRESS=0.0.0.0
-NEWCLOUD_DATA_DIR=$initialDataDir
+NEXXCLOUD_DATA_DIR=$initialDataDir
 
-DB_USER=newcloud
+DB_USER=nexxcloud
 DB_PASSWORD=$(New-SecureHex)
-DB_NAME=newcloud
+DB_NAME=nexxcloud
 
 JWT_SECRET=$(New-SecureHex)
 JWT_REFRESH_SECRET=$(New-SecureHex)
@@ -160,9 +160,9 @@ MAX_FILES_PER_USER=100000
 MAX_UPLOADS_PER_MINUTE=30
 "@
     [IO.File]::WriteAllText($EnvFile, $content, [Text.UTF8Encoding]::new($false))
-    Write-NewCloudInfo "Created .env with cryptographically random deployment secrets."
+    Write-NexxCloudInfo "Created .env with cryptographically random deployment secrets."
 } else {
-    Write-NewCloudInfo "Using existing .env; generating only missing template secrets."
+    Write-NexxCloudInfo "Using existing .env; generating only missing template secrets."
     Generate-PlaceholderSecret "DB_PASSWORD"
     Generate-PlaceholderSecret "JWT_SECRET"
     Generate-PlaceholderSecret "JWT_REFRESH_SECRET"

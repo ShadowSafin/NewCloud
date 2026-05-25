@@ -67,7 +67,7 @@ function Hero({ isMobileShell }: { isMobileShell: boolean }) {
   const dashboardRotateX = useTransform(cinematicProgress, [0, 0.62, 1], stabilizeVideoLayer ? [0, 0, 0] : [8, -5, -2]);
 
   return (
-    <section ref={heroRef} data-newcloud-hero className="relative md:min-h-[230vh]">
+    <section ref={heroRef} data-nexxcloud-hero className="relative md:min-h-[230vh]">
       <div className="relative min-h-[100svh] overflow-hidden px-5 pb-14 pt-24 md:sticky md:top-0 md:min-h-screen md:px-6 md:pb-16 md:pt-32">
         {stabilizeVideoLayer ? (
           <div
@@ -85,12 +85,12 @@ function Hero({ isMobileShell }: { isMobileShell: boolean }) {
         {stabilizeVideoLayer ? (
           <div
             aria-hidden
-            data-newcloud-hero-video-layer
+            data-nexxcloud-hero-video-layer
             className="apex-mobile-video-layer pointer-events-none absolute inset-[-8%] opacity-[0.92]"
           >
             {shouldReduceMotion ? (
               <img
-                src="/media/newcloud-hero-poster.jpg"
+                src="/media/nexxcloud-hero-poster.jpg"
                 alt=""
                 className="h-full w-full object-cover object-center"
                 draggable={false}
@@ -102,7 +102,7 @@ function Hero({ isMobileShell }: { isMobileShell: boolean }) {
         ) : (
           <motion.div
             aria-hidden
-            data-newcloud-hero-video-layer
+            data-nexxcloud-hero-video-layer
             style={{ y: videoY, scale: videoScale, opacity: videoOpacity }}
             className="pointer-events-none absolute inset-[-8%] will-change-transform"
           >
@@ -139,7 +139,7 @@ function Hero({ isMobileShell }: { isMobileShell: boolean }) {
               className="apex-mobile-frost mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-xs text-white/76 shadow-[0_0_30px_rgba(90,180,255,0.18)] backdrop-blur-2xl"
             >
               <span className="grid h-4 w-4 place-items-center rounded-full bg-white text-[10px] text-slate-950">v1</span>
-              NewCloud cinematic self-hosted cloud
+              NexxCloud cinematic self-hosted cloud
               <ArrowRight className="h-3 w-3" />
             </motion.div>
 
@@ -223,8 +223,8 @@ function useMobileShell() {
     const params = new URLSearchParams(window.location.search);
     setIsMobileShell(
       window.parent !== window ||
-      params.get("newcloudMobile") === "1" ||
-      /NewCloudMobile|Capacitor/i.test(window.navigator.userAgent)
+      params.get("nexxcloudMobile") === "1" ||
+      /NexxCloudMobile|Capacitor/i.test(window.navigator.userAgent)
     );
   }, []);
 
@@ -295,7 +295,7 @@ function HeroVideo({
   if (failed) {
     return (
       <img
-        src="/media/newcloud-hero-poster.jpg"
+        src="/media/nexxcloud-hero-poster.jpg"
         alt=""
         className="h-full w-full scale-105 object-cover object-center"
         draggable={false}
@@ -307,7 +307,7 @@ function HeroVideo({
     <>
       {!stableCompositing && (
         <img
-          src="/media/newcloud-hero-poster.jpg"
+          src="/media/nexxcloud-hero-poster.jpg"
           alt=""
           className={`absolute inset-0 h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
           draggable={false}
@@ -315,7 +315,7 @@ function HeroVideo({
       )}
       <video
         ref={videoRef}
-        data-newcloud-hero-video
+        data-nexxcloud-hero-video
         className={stableCompositing
           ? "apex-mobile-hero-video block h-full w-full object-cover object-center"
           : `h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready || preferMobileSources ? "opacity-100" : "opacity-0"}`}
@@ -324,22 +324,22 @@ function HeroVideo({
         loop
         playsInline
         preload={preferMobileSources ? "auto" : "metadata"}
-        poster="/media/newcloud-hero-poster.jpg"
+        poster="/media/nexxcloud-hero-poster.jpg"
         disablePictureInPicture
         aria-hidden
         onError={() => setFailed(true)}
       >
         {preferMobileSources ? (
           <>
-            <source src="/media/newcloud-hero-android.mp4" type="video/mp4" />
-            <source src="/media/newcloud-hero.webm" type="video/webm" />
-            <source src="/media/newcloud-hero.mp4" type="video/mp4" />
+            <source src="/media/nexxcloud-hero-android.mp4" type="video/mp4" />
+            <source src="/media/nexxcloud-hero.webm" type="video/webm" />
+            <source src="/media/nexxcloud-hero.mp4" type="video/mp4" />
           </>
         ) : (
           <>
-            <source src="/media/newcloud-hero.mp4" type="video/mp4" />
-            <source src="/media/newcloud-hero-android.mp4" type="video/mp4" />
-            <source src="/media/newcloud-hero.webm" type="video/webm" />
+            <source src="/media/nexxcloud-hero.mp4" type="video/mp4" />
+            <source src="/media/nexxcloud-hero-android.mp4" type="video/mp4" />
+            <source src="/media/nexxcloud-hero.webm" type="video/webm" />
           </>
         )}
       </video>

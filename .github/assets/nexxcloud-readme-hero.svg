@@ -1,6 +1,6 @@
 <svg width="1200" height="430" viewBox="0 0 1200 430" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">NewCloud - Your private cloud, running like an OS</title>
-  <desc id="desc">A cinematic animated NewCloud banner with a glass dashboard, deployment status, and moving data paths.</desc>
+  <title id="title">NexxCloud - Your private cloud, running like an OS</title>
+  <desc id="desc">A cinematic animated NexxCloud banner with a glass dashboard, deployment status, and moving data paths.</desc>
   <defs>
     <linearGradient id="bg" x1="40" y1="0" x2="1160" y2="430" gradientUnits="userSpaceOnUse">
       <stop stop-color="#04070F"/>
@@ -57,7 +57,7 @@
     <g>
       <rect x="81" y="55" width="20" height="16" rx="4" stroke="#29D9EC" stroke-width="2"/>
       <path d="M86 55V51H96V55" stroke="#29D9EC" stroke-width="2"/>
-      <text x="113" y="70" fill="#F5FAFF" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">NewCloud</text>
+      <text x="113" y="70" fill="#F5FAFF" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">NexxCloud</text>
       <text x="255" y="69" fill="#8DA7BA" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing="2">PRIVATE STORAGE CONTROL PLANE</text>
       <rect x="987" y="51" width="121" height="27" rx="13.5" fill="#10232D" stroke="#19404F"/>
       <circle cx="1007" cy="64.5" r="5" fill="#35E2B3">
@@ -81,7 +81,7 @@
       <circle cx="22" cy="23" r="5" fill="#E56569"/>
       <circle cx="40" cy="23" r="5" fill="#E9BE54"/>
       <circle cx="58" cy="23" r="5" fill="#35D59C"/>
-      <text x="82" y="28" fill="#86A1B3" font-family="Arial, Helvetica, sans-serif" font-size="12">newcloud.local / deployment</text>
+      <text x="82" y="28" fill="#86A1B3" font-family="Arial, Helvetica, sans-serif" font-size="12">nexxcloud.local / deployment</text>
 
       <text x="22" y="75" fill="#819AAE" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="1">SERVICES</text>
       <text x="358" y="75" fill="#819AAE" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="1">STATUS</text>

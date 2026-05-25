@@ -1,14 +1,14 @@
 <div align="center">
-  <img src="./.github/assets/newcloud-readme-hero.svg" alt="NewCloud - Your private cloud, running like an OS." width="100%">
+  <img src="./.github/assets/nexxcloud-readme-hero.svg" alt="NexxCloud - Your private cloud, running like an OS." width="100%">
   <br>
-  <h1>NewCloud</h1>
+  <h1>NexxCloud</h1>
   <h3>Your private cloud, running like an OS.</h3>
   <p>
     A self-hosted file platform with cinematic UX, content-addressed storage,
     resumable uploads, signed media delivery, and integrity-first background maintenance.
   </p>
   <p>
-    <a href="#deploy-newcloud-in-one-command"><strong>Deploy NewCloud</strong></a> |
+    <a href="#deploy-nexxcloud-in-one-command"><strong>Deploy NexxCloud</strong></a> |
     <a href="./ARCHITECTURE.md">Architecture</a> |
     <a href="./API.md">API Reference</a> |
     <a href="./CONTRIBUTING.md">Contributing</a>
@@ -26,20 +26,20 @@
 
 ---
 
-## Deploy NewCloud in One Command
+## Deploy NexxCloud in One Command
 
 > Requires Docker Engine or Docker Desktop with Docker Compose v2, plus Git.
 
 | Linux / macOS / NAS / VPS | Windows PowerShell |
 | ------------------------- | ------------------ |
-| `curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh \| sh` | `irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 \| iex` |
+| `curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NexxCloud/main/install.sh \| sh` | `irm https://raw.githubusercontent.com/ShadowSafin/NexxCloud/main/install.ps1 \| iex` |
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NexxCloud/main/install.sh | sh
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/ShadowSafin/NexxCloud/main/install.ps1 | iex
 ```
 
 <div align="center">
@@ -50,12 +50,12 @@ irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | ie
 
 | Open after deployment | Address |
 | --------------------- | ------- |
-| NewCloud              | [http://localhost:3000](http://localhost:3000) |
+| NexxCloud              | [http://localhost:3000](http://localhost:3000) |
 | API readiness         | [http://localhost:4000/health/ready](http://localhost:4000/health/ready) |
 | Queue operations      | [http://localhost:4000/admin/queues](http://localhost:4000/admin/queues) |
 
-The installer clones into `$HOME/NewCloud` on Unix systems or
-`%USERPROFILE%\NewCloud` on Windows, creates production secrets, persistent data paths,
+The installer clones into `$HOME/NexxCloud` on Unix systems or
+`%USERPROFILE%\NexxCloud` on Windows, creates production secrets, persistent data paths,
 health-checked containers, and committed migration state. It waits for the API,
 frontend, and background worker before announcing readiness, and never runs destructive
 schema synchronization.
@@ -64,7 +64,7 @@ schema synchronization.
 
 ## Overview
 
-NewCloud is a LAN-friendly, self-hosted cloud storage application designed for people who
+NexxCloud is a LAN-friendly, self-hosted cloud storage application designed for people who
 want the convenience of a polished cloud drive while keeping the binary data on hardware
 they control. A Next.js interface speaks to an Express API; PostgreSQL owns metadata,
 Redis and BullMQ operate asynchronous maintenance, and the filesystem stores immutable
@@ -75,9 +75,9 @@ integrity. Uploads become reference-counted blobs, trash and restore operations 
 accounting transactionally, media is delivered through short-lived signed URLs, and
 scheduled workers reconcile drift and clean stale state.
 
-NewCloud sits between a personal NAS and a modern hosted drive:
+NexxCloud sits between a personal NAS and a modern hosted drive:
 
-| Principle                  | What it means in NewCloud                                                                                                   |
+| Principle                  | What it means in NexxCloud                                                                                                   |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Self-hosted by default     | PostgreSQL, Redis, the API, workers, and the UI run in your Compose deployment.                                             |
 | Filesystem-first storage   | Original binary content lives under `STORAGE_ROOT`, with metadata in PostgreSQL.                                            |
@@ -110,7 +110,7 @@ The landing hero uses the committed cinematic poster as its loading and reduced-
 fallback, with the accompanying background video rendered by the web application.
 
 <p align="center">
-  <img src="./frontend/public/media/newcloud-hero-poster.jpg" alt="NewCloud cinematic hero atmosphere" width="900">
+  <img src="./frontend/public/media/nexxcloud-hero-poster.jpg" alt="NexxCloud cinematic hero atmosphere" width="900">
 </p>
 
 ### Product Surfaces
@@ -178,18 +178,18 @@ For internals, invariants, and data flows, see [ARCHITECTURE.md](./ARCHITECTURE.
 To deploy a selected branch or destination directory from the GitHub bootstrap:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh |
-  NEWCLOUD_REPOSITORY_REF=my-branch NEWCLOUD_INSTALL_DIR=/srv/newcloud sh
+curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NexxCloud/main/install.sh |
+  NEXXCLOUD_REPOSITORY_REF=my-branch NEXXCLOUD_INSTALL_DIR=/srv/nexxcloud sh
 ```
 
-To test a second Windows installation beside a running NewCloud instance:
+To test a second Windows installation beside a running NexxCloud instance:
 
 ```powershell
-$env:NEWCLOUD_INSTALL_DIR = "$HOME\NewCloud-Test"
-$env:NEWCLOUD_PROJECT_NAME = "newcloud_test"
-$env:NEWCLOUD_FRONTEND_PORT = "3300"
-$env:NEWCLOUD_BACKEND_PORT = "4400"
-irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | iex
+$env:NEXXCLOUD_INSTALL_DIR = "$HOME\NexxCloud-Test"
+$env:NEXXCLOUD_PROJECT_NAME = "nexxcloud_test"
+$env:NEXXCLOUD_FRONTEND_PORT = "3300"
+$env:NEXXCLOUD_BACKEND_PORT = "4400"
+irm https://raw.githubusercontent.com/ShadowSafin/NexxCloud/main/install.ps1 | iex
 ```
 
 If the repository is already cloned, start it locally with `bash setup.sh` on Unix
@@ -202,7 +202,7 @@ path never uses destructive schema synchronization. Fresh databases run
 `prisma migrate deploy`; databases created by the earlier schema-push startup are
 detected on Prisma `P3005`, upgraded with committed additive baseline SQL, recorded in
 migration history, and returned to normal migration deployment only after identifying
-the expected legacy NewCloud tables. The API becomes healthy
+the expected legacy NexxCloud tables. The API becomes healthy
 only after PostgreSQL, Redis, and writable storage pass readiness checks.
 
 ### Deployment Scripts
@@ -247,7 +247,7 @@ PostgreSQL and Redis services with health checks and persistent storage.
 | Portainer              | Create a Git Repository stack targeting `docker-compose.yml`; paste production variables generated from `.env.example`.       | Compose-compatible             |
 | Coolify                | Add a Docker Compose resource from GitHub, set required variables, and publish only the `frontend` service on port `3000`.     | Compose-compatible             |
 | Dockge                 | Clone locally, run setup once for `.env`, then manage the root Compose stack in Dockge.                                        | Compose-compatible             |
-| Cosmos Cloud           | Run NewCloud with Docker Compose on the managed host; a native Cosmos-Compose marketplace descriptor is not yet distributed.  | Host Compose path              |
+| Cosmos Cloud           | Run NexxCloud with Docker Compose on the managed host; a native Cosmos-Compose marketplace descriptor is not yet distributed.  | Host Compose path              |
 | CasaOS / Umbrel        | Use the host terminal deployment command; branded marketplace packaging is intentionally separate from the production stack. | Host Compose path              |
 | Railway / Render       | Service-by-service Docker deployment can be prepared from these Dockerfiles; persistent volume and managed DB wiring needed.  | Future hosted-platform target  |
 
@@ -268,8 +268,8 @@ Required variables are `DB_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET`,
 1. In **Stacks**, choose **Add stack** and the Git repository option.
 2. Enter this repository URL and `docker-compose.yml` as the Compose path.
 3. Define the five required secrets above plus `FRONTEND_URL` for the address users open.
-4. For durable file bytes across Git redeployments, set `NEWCLOUD_DATA_DIR` to an
-   absolute persistent host path, such as `/srv/newcloud/data`.
+4. For durable file bytes across Git redeployments, set `NEXXCLOUD_DATA_DIR` to an
+   absolute persistent host path, such as `/srv/nexxcloud/data`.
 5. Deploy the stack and wait for `frontend` and `backend` health checks to become healthy.
 
 Reference: [Portainer - add a stack from Git](https://docs.portainer.io/2.33-lts/user/docker/stacks/add)
@@ -346,7 +346,7 @@ Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 | Variable                        | Purpose                                                              | Default or example                       |
 | ------------------------------- | -------------------------------------------------------------------- | ---------------------------------------- |
 | `NODE_ENV`                      | Enables production secret and startup safety checks                  | `production` in deployments              |
-| `COMPOSE_PROJECT_NAME`          | Isolates services, volumes, and networks per deployment              | `newcloud`                               |
+| `COMPOSE_PROJECT_NAME`          | Isolates services, volumes, and networks per deployment              | `nexxcloud`                               |
 | `DB_PASSWORD`                   | PostgreSQL password; also validated before production API startup    | Generated by setup                       |
 | `DATABASE_URL`                  | PostgreSQL connection for the API and worker                         | Required in production                   |
 | `REDIS_URL`                     | BullMQ and Redis connection                                          | `redis://localhost:6379` in local config |
@@ -372,7 +372,7 @@ Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 
 ## Local Network Access
 
-NewCloud binds the UI and API to all host interfaces by default for trusted home-network
+NexxCloud binds the UI and API to all host interfaces by default for trusted home-network
 installations. The launchers write detected network information into `.env`; LAN-connected
 browser clients can then open the same interface:
 
@@ -383,7 +383,7 @@ http://<hostname>.local:3000
 
 The API publishes both the web service and API service over mDNS. Private IPv4 origins and
 local hostnames are accepted by the API CORS policy. For any network beyond a trusted LAN,
-place NewCloud behind HTTPS and a reverse proxy.
+place NexxCloud behind HTTPS and a reverse proxy.
 
 ## Reverse Proxy and HTTPS
 
@@ -414,7 +414,7 @@ file; they remain on an internal data network.
 
 | Data                       | Location                                                | Backup rule                                     |
 | -------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
-| File blobs and thumbnails  | `${NEWCLOUD_DATA_DIR:-./data}/storage` on the host      | Back up together with database metadata.        |
+| File blobs and thumbnails  | `${NEXXCLOUD_DATA_DIR:-./data}/storage` on the host      | Back up together with database metadata.        |
 | PostgreSQL metadata        | Docker volume `${COMPOSE_PROJECT_NAME}_postgres_data`    | Use `pg_dump` before updates and on a schedule. |
 | Redis queue persistence    | Docker volume `${COMPOSE_PROJECT_NAME}_redis_data`       | Useful for queued work; not file metadata.      |
 | Temporary upload material  | Within the storage bind mount                           | May be cleaned after interrupted uploads.       |
@@ -508,7 +508,7 @@ Important deployment guidance:
 
 - Keep `BLOCK_DANGEROUS_UPLOADS=true` unless an administrator deliberately accepts the
   risk of storing executable content.
-- Terminate HTTPS before exposing NewCloud beyond a trusted local network.
+- Terminate HTTPS before exposing NexxCloud beyond a trusted local network.
 - Protect `/admin/queues` with a strong unique password and restrict it at the proxy when possible.
 - Back up PostgreSQL metadata and the entire `data/storage` tree together.
 
@@ -572,4 +572,4 @@ media authorization should arrive with tests that exercise failure and cleanup p
 ## License
 
 No license file is currently committed in this repository. Add an explicit license before
-publishing or redistributing NewCloud as an open-source project.
+publishing or redistributing NexxCloud as an open-source project.

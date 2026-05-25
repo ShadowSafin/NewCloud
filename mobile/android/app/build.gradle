@@ -6,22 +6,22 @@ if (releaseSigningPropertiesFile.exists()) {
     releaseSigningPropertiesFile.withInputStream { releaseSigningProperties.load(it) }
 }
 
-def releaseStoreFile = releaseSigningProperties.getProperty('storeFile') ?: System.getenv('NEWCLOUD_ANDROID_STORE_FILE')
-def releaseStorePassword = releaseSigningProperties.getProperty('storePassword') ?: System.getenv('NEWCLOUD_ANDROID_STORE_PASSWORD')
-def releaseKeyAlias = releaseSigningProperties.getProperty('keyAlias') ?: System.getenv('NEWCLOUD_ANDROID_KEY_ALIAS')
-def releaseKeyPassword = releaseSigningProperties.getProperty('keyPassword') ?: System.getenv('NEWCLOUD_ANDROID_KEY_PASSWORD')
+def releaseStoreFile = releaseSigningProperties.getProperty('storeFile') ?: System.getenv('NEXXCLOUD_ANDROID_STORE_FILE')
+def releaseStorePassword = releaseSigningProperties.getProperty('storePassword') ?: System.getenv('NEXXCLOUD_ANDROID_STORE_PASSWORD')
+def releaseKeyAlias = releaseSigningProperties.getProperty('keyAlias') ?: System.getenv('NEXXCLOUD_ANDROID_KEY_ALIAS')
+def releaseKeyPassword = releaseSigningProperties.getProperty('keyPassword') ?: System.getenv('NEXXCLOUD_ANDROID_KEY_PASSWORD')
 def releaseSigningConfigured = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
 def requestedReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
 
 if (requestedReleaseBuild && !releaseSigningConfigured) {
-    throw new GradleException('Release signing is not configured. Provide mobile/android/keystore.properties or NEWCLOUD_ANDROID_* environment variables.')
+    throw new GradleException('Release signing is not configured. Provide mobile/android/keystore.properties or NEXXCLOUD_ANDROID_* environment variables.')
 }
 
 android {
-    namespace "com.newcloud.app"
+    namespace "com.nexxcloud.app"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.newcloud.app"
+        applicationId "com.nexxcloud.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

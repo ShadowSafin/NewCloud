@@ -11,7 +11,7 @@ import {
 } from "../lib/chunkedUpload";
 import { filesApi } from "../lib/api";
 
-const STORAGE_KEY = "cloudstore-uploads";
+const STORAGE_KEY = "nexxcloud-uploads";
 const DEFAULT_UPLOAD_CHUNK_SIZE = 16 * 1024 * 1024;
 
 // Shared task map

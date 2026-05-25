@@ -129,7 +129,7 @@ export function Header({ onUploadClick, onNewFolderClick, onSearchChange, onTogg
         {/* Desktop Address Bar */}
         <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/35 border border-white/[0.05] text-xs text-white/90">
           <Globe className="w-3 h-3 text-cyan-400/80 glow-cyan animate-pulse" />
-          <span className="text-white/50 font-medium">newcloud.local</span>
+          <span className="text-white/50 font-medium">nexxcloud.local</span>
           <span className="text-white/25 font-light">/</span>
           <span className="text-white/70 font-semibold">{pathText}</span>
           {currentFolderName && (

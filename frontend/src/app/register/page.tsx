@@ -57,7 +57,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
           <BrandMark className="h-10 w-10 rounded-xl" priority />
-          <span className="text-white font-semibold text-lg tracking-tight">NewCloud</span>
+          <span className="text-white font-semibold text-lg tracking-tight">NexxCloud</span>
         </div>
 
         {/* Center features */}
@@ -94,7 +94,7 @@ export default function RegisterPage() {
 
         {/* Bottom tagline */}
         <p className="relative z-10 text-[11px] text-white/20 font-mono tracking-wider uppercase">
-          newcloud.local · private cloud storage
+          nexxcloud.local · private cloud storage
         </p>
       </div>
 
@@ -111,7 +111,7 @@ export default function RegisterPage() {
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-10 lg:hidden">
             <BrandMark className="h-9 w-9 rounded-xl" priority />
-            <span className="text-white font-semibold tracking-tight">NewCloud</span>
+            <span className="text-white font-semibold tracking-tight">NexxCloud</span>
           </div>
 
           {/* Heading */}

@@ -5,12 +5,12 @@ $ErrorActionPreference = "Stop"
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $EnvFile = Join-Path $RootDir ".env"
 
-function Write-NewCloudInfo([string] $Message) {
-    Write-Host "[NewCloud] $Message" -ForegroundColor Cyan
+function Write-NexxCloudInfo([string] $Message) {
+    Write-Host "[NexxCloud] $Message" -ForegroundColor Cyan
 }
 
-function Throw-NewCloudError([string] $Message) {
-    throw "[NewCloud] $Message"
+function Throw-NexxCloudError([string] $Message) {
+    throw "[NexxCloud] $Message"
 }
 
 function Get-EnvValue([string] $Key) {
@@ -54,7 +54,7 @@ function Assert-StrongSecret([string] $Key) {
         $value -eq "changeme" -or
         $value -eq "cloudpass" -or
         $value.Length -lt 32) {
-        Throw-NewCloudError "$Key is missing or unsafe. Run setup.bat to generate secure production configuration."
+        Throw-NexxCloudError "$Key is missing or unsafe. Run setup.bat to generate secure production configuration."
     }
 }
 
@@ -80,13 +80,13 @@ function Wait-Endpoint([string] $Label, [string] $Url) {
         try {
             $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 3
             if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
-                Write-NewCloudInfo "$Label is healthy: $Url"
+                Write-NexxCloudInfo "$Label is healthy: $Url"
                 return
             }
         } catch {}
         Start-Sleep -Seconds 2
     }
-    Throw-NewCloudError "$Label did not become healthy. Inspect logs with: docker compose logs $Label"
+    Throw-NexxCloudError "$Label did not become healthy. Inspect logs with: docker compose logs $Label"
 }
 
 function Wait-ServiceHealth([string] $Service) {
@@ -97,11 +97,11 @@ function Wait-ServiceHealth([string] $Service) {
             if ($containerId) {
                 $status = (docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" $containerId 2>$null).Trim()
                 if ($status -eq "healthy") {
-                    Write-NewCloudInfo "$Service is healthy."
+                    Write-NexxCloudInfo "$Service is healthy."
                     return
                 }
                 if ($status -eq "unhealthy" -or $status -eq "exited" -or $status -eq "dead") {
-                    Throw-NewCloudError "$Service entered state '$status'. Inspect logs with: docker compose logs $Service"
+                    Throw-NexxCloudError "$Service entered state '$status'. Inspect logs with: docker compose logs $Service"
                 }
             }
             Start-Sleep -Seconds 2
@@ -109,22 +109,22 @@ function Wait-ServiceHealth([string] $Service) {
     } finally {
         Pop-Location
     }
-    Throw-NewCloudError "$Service did not become healthy. Inspect logs with: docker compose logs $Service"
+    Throw-NexxCloudError "$Service did not become healthy. Inspect logs with: docker compose logs $Service"
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Throw-NewCloudError "Docker is not installed."
+    Throw-NexxCloudError "Docker is not installed."
 }
 docker compose version *> $null
 if ($LASTEXITCODE -ne 0) {
-    Throw-NewCloudError "Docker Compose v2 is required."
+    Throw-NexxCloudError "Docker Compose v2 is required."
 }
 docker info *> $null
 if ($LASTEXITCODE -ne 0) {
-    Throw-NewCloudError "Docker is installed but the Docker engine is not running."
+    Throw-NexxCloudError "Docker is installed but the Docker engine is not running."
 }
 if (-not (Test-Path $EnvFile)) {
-    Throw-NewCloudError "No .env configuration found. Run setup.bat first."
+    Throw-NexxCloudError "No .env configuration found. Run setup.bat first."
 }
 
 if ((Get-EnvValue "NODE_ENV") -eq "production") {
@@ -141,7 +141,10 @@ if ($lanIp) {
 }
 Set-EnvValue "HOST_HOSTNAME" $env:COMPUTERNAME
 
-$dataDir = Get-EnvValue "NEWCLOUD_DATA_DIR"
+$dataDir = Get-EnvValue "NEXXCLOUD_DATA_DIR"
+if ([string]::IsNullOrWhiteSpace($dataDir)) {
+    $dataDir = Get-EnvValue "NEWCLOUD_DATA_DIR"
+}
 if ([string]::IsNullOrWhiteSpace($dataDir)) {
     $dataDir = ".\data"
 }
@@ -154,13 +157,13 @@ Push-Location $RootDir
 try {
     docker compose --env-file $EnvFile config --quiet
     if ($LASTEXITCODE -ne 0) {
-        Throw-NewCloudError "Docker Compose configuration validation failed."
+        Throw-NexxCloudError "Docker Compose configuration validation failed."
     }
 
-    Write-NewCloudInfo "Building and starting the NewCloud stack."
+    Write-NexxCloudInfo "Building and starting the NexxCloud stack."
     docker compose --env-file $EnvFile up -d --build --remove-orphans
     if ($LASTEXITCODE -ne 0) {
-        Throw-NewCloudError "Docker Compose failed to start NewCloud."
+        Throw-NexxCloudError "Docker Compose failed to start NexxCloud."
     }
 } finally {
     Pop-Location
@@ -175,7 +178,7 @@ Wait-Endpoint "backend" "http://127.0.0.1:$backendPort/health/ready"
 Wait-Endpoint "frontend" "http://127.0.0.1:$frontendPort/health"
 Wait-ServiceHealth "worker"
 
-Write-NewCloudInfo "NewCloud is ready at http://localhost:$frontendPort"
+Write-NexxCloudInfo "NexxCloud is ready at http://localhost:$frontendPort"
 if ($lanIp) {
-    Write-NewCloudInfo "LAN access: http://${lanIp}:$frontendPort"
+    Write-NexxCloudInfo "LAN access: http://${lanIp}:$frontendPort"
 }

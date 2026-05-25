@@ -9,18 +9,18 @@ class MdnsService {
 
       // Advertise Web App (port 3000)
       this.bonjour.publish({
-        name: "NewCloud Web App",
+        name: "NexxCloud Web App",
         type: "http",
         port: 3000,
-        txt: { platform: "NewCloud" }
+        txt: { platform: "NexxCloud" }
       });
 
       // Advertise API (port 4000)
       this.bonjour.publish({
-        name: "NewCloud API",
+        name: "NexxCloud API",
         type: "http",
         port: 4000,
-        txt: { platform: "NewCloud" }
+        txt: { platform: "NexxCloud" }
       });
 
       console.log("[mDNS] Bonjour services published successfully on local network");

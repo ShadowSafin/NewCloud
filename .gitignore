@@ -12,7 +12,7 @@ out/
 # The Capacitor wrapper uses a checked-in shell as its WebView entrypoint.
 !mobile/dist/
 !mobile/dist/index.html
-!mobile/dist/newcloud-icon.png
+!mobile/dist/nexxcloud-icon.png
 
 # Environment
 .env

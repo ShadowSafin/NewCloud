@@ -35,7 +35,7 @@ export function AppShell({ children }: AppShellProps) {
         const res = await fetch(url, { method: "GET", cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.name === "NewCloud") {
+          if (data && data.name === "NexxCloud") {
             return true;
           }
         }
@@ -121,7 +121,7 @@ export function AppShell({ children }: AppShellProps) {
       const res = await fetch(url, { method: "GET", cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        if (data && data.name === "NewCloud") {
+        if (data && data.name === "NexxCloud") {
           setIsOffline(false);
           setIsReconnecting(false);
           return;
@@ -215,7 +215,7 @@ export function AppShell({ children }: AppShellProps) {
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-white tracking-tight">Connection Lost</h2>
               <p className="text-sm text-slate-400 leading-relaxed">
-                Could not reach the NewCloud server. Please check your Wi-Fi connection and ensure the server is running.
+                Could not reach the NexxCloud server. Please check your Wi-Fi connection and ensure the server is running.
               </p>
             </div>
 

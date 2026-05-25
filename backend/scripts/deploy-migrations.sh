@@ -2,7 +2,7 @@
 set -eu
 
 log() {
-  printf '%s\n' "[NewCloud migrations] $*"
+  printf '%s\n' "[NexxCloud migrations] $*"
 }
 
 output_file=$(mktemp)
@@ -31,14 +31,14 @@ async function verifyLegacyDatabase() {
   const missing = ["users", "folders", "files"].filter((table) => !tables.has(table));
 
   if (missing.length > 0) {
-    throw new Error(`Database is nonempty but does not match a legacy NewCloud schema; missing: ${missing.join(", ")}`);
+    throw new Error(`Database is nonempty but does not match a legacy NexxCloud schema; missing: ${missing.join(", ")}`);
   }
 }
 
 verifyLegacyDatabase()
   .then(() => prisma.$disconnect())
   .catch(async (error) => {
-    console.error(`[NewCloud migrations] ${error.message}`);
+    console.error(`[NexxCloud migrations] ${error.message}`);
     await prisma.$disconnect();
     process.exit(1);
   });

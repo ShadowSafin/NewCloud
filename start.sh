@@ -5,11 +5,11 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ENV_FILE="$ROOT_DIR/.env"
 
 info() {
-  printf '%s\n' "[NewCloud] $*"
+  printf '%s\n' "[NexxCloud] $*"
 }
 
 fail() {
-  printf '%s\n' "[NewCloud] ERROR: $*" >&2
+  printf '%s\n' "[NexxCloud] ERROR: $*" >&2
   exit 1
 }
 
@@ -84,7 +84,8 @@ if [ "$(get_env NODE_ENV)" = "production" ]; then
   validate_secret BULL_BOARD_PASSWORD
 fi
 
-data_dir=$(get_env NEWCLOUD_DATA_DIR)
+data_dir=$(get_env NEXXCLOUD_DATA_DIR)
+[ -n "$data_dir" ] || data_dir=$(get_env NEWCLOUD_DATA_DIR)
 [ -n "$data_dir" ] || data_dir="./data"
 case "$data_dir" in
   /*) mkdir -p "$data_dir/storage" ;;
@@ -93,7 +94,7 @@ esac
 
 cd "$ROOT_DIR"
 docker compose --env-file "$ENV_FILE" config --quiet
-info "Building and starting the NewCloud stack."
+info "Building and starting the NexxCloud stack."
 docker compose --env-file "$ENV_FILE" up -d --build --remove-orphans
 
 frontend_port=$(get_env FRONTEND_PORT)
@@ -105,7 +106,7 @@ wait_for_url "backend" "http://127.0.0.1:${backend_port}/health/ready"
 wait_for_url "frontend" "http://127.0.0.1:${frontend_port}/health"
 wait_for_service_health "worker"
 
-info "NewCloud is ready at http://localhost:${frontend_port}"
+info "NexxCloud is ready at http://localhost:${frontend_port}"
 lan_ip=$(get_env HOST_LAN_IP)
 if [ -n "$lan_ip" ]; then
   info "LAN access: http://${lan_ip}:${frontend_port}"

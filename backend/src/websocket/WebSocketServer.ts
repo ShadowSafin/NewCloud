@@ -105,7 +105,7 @@ export class AppWebSocketServer {
       if (!this.connections.has(decoded.userId)) {
         this.connections.set(decoded.userId, new Set());
         if (this.subClient) {
-          const userChannel = `cloudstore:ws:${decoded.userId}`;
+          const userChannel = `nexxcloud:ws:${decoded.userId}`;
           this.subClient.subscribe(userChannel).catch((err) => {
             console.error(`[WebSocket] Failed to subscribe to channel ${userChannel}:`, err.message);
           });
@@ -173,7 +173,7 @@ export class AppWebSocketServer {
       if (userConnections.size === 0) {
         this.connections.delete(ws.userId);
         if (this.subClient) {
-          const userChannel = `cloudstore:ws:${ws.userId}`;
+          const userChannel = `nexxcloud:ws:${ws.userId}`;
           this.subClient.unsubscribe(userChannel).catch((err) => {
             console.error(`[WebSocket] Failed to unsubscribe from channel ${userChannel}:`, err.message);
           });
@@ -264,17 +264,17 @@ export class AppWebSocketServer {
       this.subClient = createRedisConnection();
 
       await this.subClient.subscribe(WS_CHANNEL);
-      await this.subClient.subscribe("cloudstore:ws:broadcast");
+      await this.subClient.subscribe("nexxcloud:ws:broadcast");
 
       this.subClient.on("message", (channel, data) => {
         try {
           const parsed = JSON.parse(data);
           if (parsed.type === "__redis_sync__") return;
 
-          if (channel === WS_CHANNEL || channel === "cloudstore:ws:broadcast") {
+          if (channel === WS_CHANNEL || channel === "nexxcloud:ws:broadcast") {
             this.broadcast(parsed as WSMessage, parsed.excludeUserId);
-          } else if (channel.startsWith("cloudstore:ws:")) {
-            const userId = channel.substring("cloudstore:ws:".length);
+          } else if (channel.startsWith("nexxcloud:ws:")) {
+            const userId = channel.substring("nexxcloud:ws:".length);
             let wsMessage: WSMessage;
             if (parsed.type && parsed.payload && parsed.timestamp) {
               wsMessage = parsed as WSMessage;

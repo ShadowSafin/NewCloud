@@ -1,7 +1,7 @@
 {
-  "name": "newcloud-mobile",
+  "name": "nexxcloud-mobile",
   "version": "1.0.0",
-  "description": "NewCloud Mobile Wrapper",
+  "description": "NexxCloud Mobile Wrapper",
   "private": true,
   "scripts": {
     "build": "tsc --noEmit",

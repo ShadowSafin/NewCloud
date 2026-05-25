@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <link rel="icon" type="image/png" href="./newcloud-icon.png">
-  <title>NewCloud Mobile</title>
+  <link rel="icon" type="image/png" href="./nexxcloud-icon.png">
+  <title>NexxCloud Mobile</title>
   <style>
     :root {
       --bg: #03050d;
@@ -505,17 +505,17 @@
       <div class="connect-card">
         <div class="brand">
           <div class="logo" aria-hidden="true">
-            <img src="./newcloud-icon.png" alt="">
+            <img src="./nexxcloud-icon.png" alt="">
           </div>
           <div>
-            <h1>NewCloud</h1>
+            <h1>NexxCloud</h1>
             <p class="subtitle">Connect to your private cloud on LAN.</p>
           </div>
         </div>
 
         <label class="label" for="serverUrl">Server URL</label>
         <input id="serverUrl" class="input" inputmode="url" autocomplete="url" spellcheck="false" placeholder="192.168.1.20:3000">
-        <p class="hint">Use your NewCloud web app address, for example http://192.168.x.x:3000 or http://newcloud.local.</p>
+        <p class="hint">Use your NexxCloud web app address, for example http://192.168.x.x:3000 or http://nexxcloud.local.</p>
 
         <div class="buttons">
           <button id="connectBtn" class="button primary">Connect</button>
@@ -534,7 +534,7 @@
       <iframe
         id="webview"
         class="webview"
-        title="NewCloud web app"
+        title="NexxCloud web app"
         scrolling="yes"
         allow="autoplay *; camera *; microphone *; geolocation *; clipboard-read *; clipboard-write *; encrypted-media *; fullscreen *; picture-in-picture *"
         sandbox="allow-downloads allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
@@ -548,7 +548,7 @@
       <div id="loading" class="loading">
         <div class="loader-card">
           <div class="spinner"></div>
-          <strong>Loading NewCloud</strong>
+          <strong>Loading NexxCloud</strong>
           <p class="subtitle" id="loadingText">Connecting to server...</p>
         </div>
       </div>
@@ -556,7 +556,7 @@
       <div id="offline" class="offline">
         <div class="loader-card">
           <strong>Connection lost</strong>
-          <p class="subtitle">Check your Wi-Fi or make sure the NewCloud server is running.</p>
+          <p class="subtitle">Check your Wi-Fi or make sure the NexxCloud server is running.</p>
           <div class="buttons">
             <button id="retryBtn" class="button primary">Retry connection</button>
             <button id="changeServerBtn" class="button">Change server</button>
@@ -568,7 +568,7 @@
     <div id="sheet" class="sheet" aria-hidden="true">
       <div class="sheet-panel">
         <div class="sheet-title">
-          <strong>NewCloud</strong>
+          <strong>NexxCloud</strong>
           <span id="serverLabel">Native mobile actions</span>
         </div>
         <div class="sheet-actions">
@@ -594,8 +594,8 @@
     const Plugins = () => window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins : {};
 
     const keys = {
-      server: "newcloud.mobile.server",
-      history: "newcloud.mobile.history"
+      server: "nexxcloud.mobile.server",
+      history: "nexxcloud.mobile.history"
     };
 
     const state = {
@@ -687,7 +687,7 @@
         const parsed = new URL(url);
         return parsed.host;
       } catch {
-        return "NewCloud";
+        return "NexxCloud";
       }
     }
 
@@ -701,7 +701,7 @@
 
     function withMobileParams(url, extras) {
       const parsed = new URL(url);
-      parsed.searchParams.set("newcloudMobile", "1");
+      parsed.searchParams.set("nexxcloudMobile", "1");
       Object.entries(extras || {}).forEach(([key, value]) => {
         parsed.searchParams.set(key, String(value));
       });
@@ -709,7 +709,7 @@
     }
 
     function shouldUseFramedWebView() {
-      return new URLSearchParams(window.location.search).get("newcloudFrame") === "1";
+      return new URLSearchParams(window.location.search).get("nexxcloudFrame") === "1";
     }
 
     async function verifyReachable(url) {
@@ -849,15 +849,15 @@
 
     async function sendFilesToWeb(files) {
       if (!state.serverUrl || !webview.contentWindow) {
-        showToast("Connect to NewCloud first.");
+        showToast("Connect to NexxCloud first.");
         return;
       }
       webview.contentWindow.postMessage({
-        source: "newcloud-mobile-shell",
+        source: "nexxcloud-mobile-shell",
         type: "native-upload-files",
         files
       }, targetOrigin());
-      showToast("Sent to NewCloud upload queue.");
+      showToast("Sent to NexxCloud upload queue.");
       toggleSheet(false);
     }
 
@@ -878,7 +878,7 @@
         });
         if (!photo || !photo.dataUrl) return;
         await sendFilesToWeb([{
-          name: "newcloud-" + Date.now() + ".jpg",
+          name: "nexxcloud-" + Date.now() + ".jpg",
           mimeType: "image/jpeg",
           dataUrl: photo.dataUrl
         }]);
@@ -894,10 +894,10 @@
         return;
       }
       await Share.share({
-        title: "NewCloud",
-        text: "Open my NewCloud server",
+        title: "NexxCloud",
+        text: "Open my NexxCloud server",
         url: state.serverUrl,
-        dialogTitle: "Share NewCloud server"
+        dialogTitle: "Share NexxCloud server"
       });
       toggleSheet(false);
     }
@@ -911,7 +911,7 @@
       try {
         const permission = await PushNotifications.requestPermissions();
         if (permission.receive === "granted") {
-          showToast("Notifications are ready for future NewCloud alerts.");
+          showToast("Notifications are ready for future NexxCloud alerts.");
         } else {
           showToast("Notifications were not enabled.");
         }
@@ -997,10 +997,10 @@
 
     window.addEventListener("message", (event) => {
       const message = event.data;
-      if (!message || message.source !== "newcloud-web") return;
-      if (message.type === "native-upload-accepted") showToast("Upload started in NewCloud.");
-      if (message.type === "native-upload-rejected") showToast("Sign in to NewCloud before uploading.");
-      if (message.type === "native-upload-failed") showToast("NewCloud could not import that file.");
+      if (!message || message.source !== "nexxcloud-web") return;
+      if (message.type === "native-upload-accepted") showToast("Upload started in NexxCloud.");
+      if (message.type === "native-upload-rejected") showToast("Sign in to NexxCloud before uploading.");
+      if (message.type === "native-upload-failed") showToast("NexxCloud could not import that file.");
     });
 
     document.addEventListener("DOMContentLoaded", async () => {

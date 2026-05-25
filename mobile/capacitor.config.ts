@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.newcloud.app',
-  appName: 'NewCloud',
+  appId: 'com.nexxcloud.app',
+  appName: 'NexxCloud',
   webDir: 'dist',
   server: {
     cleartext: true,
@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
       '172.31.*.*',
       '192.168.*.*',
       '*.local',
-      'newcloud.local'
+      'nexxcloud.local'
     ]
   },
   android: {

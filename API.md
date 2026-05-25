@@ -1,4 +1,4 @@
-# NewCloud HTTP API
+# NexxCloud HTTP API
 
 This reference documents the implemented Express API mounted by
 `backend/src/server.ts`. It is intended for browser integrations, command-line testing,

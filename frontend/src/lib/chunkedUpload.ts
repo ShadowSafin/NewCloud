@@ -4,7 +4,7 @@ const MAX_CONCURRENT = 3;
 const MAX_RETRIES = 3;
 const MERGE_POLL_INTERVAL_MS = 1000;
 const MAX_MERGE_WAIT_MS = 24 * 60 * 60 * 1000;
-const STORAGE_KEY = "cloudstore-upload-queue";
+const STORAGE_KEY = "nexxcloud-upload-queue";
 
 export interface UploadSession {
   sessionId: string;

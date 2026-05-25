@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>NewCloud</string>
+        <string>NexxCloud</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,10 +22,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.newcloud.app</string>
+			<string>com.nexxcloud.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>newcloud</string>
+				<string>nexxcloud</string>
 			</array>
 		</dict>
 	</array>
@@ -46,18 +46,18 @@
 	<array>
 		<string>_http._tcp</string>
 		<string>_https._tcp</string>
-		<string>_newcloud._tcp</string>
+		<string>_nexxcloud._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>NewCloud uses the camera so you can upload photos and scan server QR codes.</string>
+	<string>NexxCloud uses the camera so you can upload photos and scan server QR codes.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>NewCloud connects to self-hosted servers on your local network.</string>
+	<string>NexxCloud connects to self-hosted servers on your local network.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>NewCloud may use the microphone when capturing media for upload.</string>
+	<string>NexxCloud may use the microphone when capturing media for upload.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>NewCloud can save downloaded media to your photo library when you choose to do so.</string>
+	<string>NexxCloud can save downloaded media to your photo library when you choose to do so.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>NewCloud uses your photo library so you can upload photos and videos.</string>
+	<string>NexxCloud uses your photo library so you can upload photos and videos.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIBackgroundModes</key>

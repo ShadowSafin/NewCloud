@@ -81,7 +81,7 @@ export default function SharePage() {
       <header className="border-b border-hairline">
         <div className="max-w-4xl mx-auto px-6 h-14 flex items-center gap-3">
           <BrandMark className="h-7 w-7 rounded-full" priority />
-          <span className="text-sm text-ink">NewCloud</span>
+          <span className="text-sm text-ink">NexxCloud</span>
           <span className="text-xs text-body-mid">Shared File</span>
         </div>
       </header>

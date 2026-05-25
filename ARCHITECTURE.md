@@ -1,6 +1,6 @@
-# NewCloud Architecture
+# NexxCloud Architecture
 
-This document describes the implemented NewCloud system: its processes, data model,
+This document describes the implemented NexxCloud system: its processes, data model,
 filesystem invariants, upload pipeline, integrity workers, authentication boundary, and
 deployment shape. It is written for contributors changing data ownership or failure
 behavior, where an apparently small change can affect persisted files.
@@ -26,7 +26,7 @@ behavior, where an apparently small change can affect persisted files.
 
 ## System Context
 
-NewCloud is a self-hosted web application whose authoritative metadata is held in
+NexxCloud is a self-hosted web application whose authoritative metadata is held in
 PostgreSQL and whose binary payloads are held in a content-addressed filesystem store.
 The frontend never needs to know physical blob paths. It operates through authenticated
 REST operations and expiring media URLs.
@@ -57,7 +57,7 @@ post-commit filesystem cleanup:
 ## Repository Layout
 
 ```text
-NewCloud/
+NexxCloud/
 |-- backend/
 |   |-- prisma/
 |   |   |-- schema.prisma
@@ -100,8 +100,8 @@ Docker Compose provisions five runtime services:
 | Service    | Image/runtime            | Published port        | Durable resources        | Role                                                                               |
 | ---------- | ------------------------ | --------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
 | `frontend` | Node 22, Next standalone | `${FRONTEND_PORT}:3000` | None                     | Web application, frontend health endpoint, and `/api` reverse proxy.               |
-| `backend`  | Node 20, Express         | `${BACKEND_PORT}:4000`  | `${NEWCLOUD_DATA_DIR}`   | REST API, secure streaming, readiness checks, queue dashboard, mDNS, WebSockets.   |
-| `worker`   | Same backend image       | None                  | `${NEWCLOUD_DATA_DIR}`   | BullMQ consumers and scheduled integrity jobs; waits for healthy backend startup.  |
+| `backend`  | Node 20, Express         | `${BACKEND_PORT}:4000`  | `${NEXXCLOUD_DATA_DIR}`   | REST API, secure streaming, readiness checks, queue dashboard, mDNS, WebSockets.   |
+| `worker`   | Same backend image       | None                  | `${NEXXCLOUD_DATA_DIR}`   | BullMQ consumers and scheduled integrity jobs; waits for healthy backend startup.  |
 | `postgres` | PostgreSQL 16 Alpine     | Not host-published    | `${COMPOSE_PROJECT_NAME}_postgres_data` | Transactional metadata; internal data network only.                  |
 | `redis`    | Redis 7 Alpine           | Not host-published    | `${COMPOSE_PROJECT_NAME}_redis_data`    | Queues and event transport; internal data network only.               |
 
@@ -114,7 +114,7 @@ sh ./scripts/deploy-migrations.sh && npm start
 Fresh databases use standard Prisma migration deployment. If Prisma reports `P3005`
 for an installation created by the earlier schema-push startup, the launcher applies
 and records the committed additive baseline and blob migration only after recognizing
-legacy NewCloud core tables, then resumes normal
+legacy NexxCloud core tables, then resumes normal
 `prisma migrate deploy` processing. Startup refuses weak production secrets, waits on
 PostgreSQL and Redis health, verifies writable storage, and exposes readiness at
 `/health/ready` only after dependencies respond.
@@ -225,7 +225,7 @@ erDiagram
 
 ### Logical Versus Physical Size
 
-NewCloud accounts storage at the file metadata level:
+NexxCloud accounts storage at the file metadata level:
 
 ```text
 storageUsed = SUM(File.size WHERE userId = ? AND deletedAt IS NULL)
@@ -461,7 +461,7 @@ initialization verifies that the configured root is writable.
 
 ## Realtime Infrastructure
 
-NewCloud includes:
+NexxCloud includes:
 
 - a WebSocket upgrade server on `/ws`,
 - connection heartbeat/presence logic,
@@ -485,8 +485,8 @@ be logged; hardening this handshake is a pending security task.
 
 | Name               | Port   | Role     |
 | ------------------ | ------ | -------- |
-| `NewCloud Web App` | `3000` | Frontend |
-| `NewCloud API`     | `4000` | Backend  |
+| `NexxCloud Web App` | `3000` | Frontend |
+| `NexxCloud API`     | `4000` | Backend  |
 
 The authenticated network-status endpoint reports detected IPv4 addresses, a preferred LAN
 address when configured, and a `.local` hostname URL for the frontend.

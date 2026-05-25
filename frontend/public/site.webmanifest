@@ -1,6 +1,6 @@
 {
-  "name": "NewCloud",
-  "short_name": "NewCloud",
+  "name": "NexxCloud",
+  "short_name": "NexxCloud",
   "description": "Self-hosted cloud storage platform",
   "start_url": "/",
   "display": "standalone",

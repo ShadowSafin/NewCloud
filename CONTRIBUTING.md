@@ -1,6 +1,6 @@
-# Contributing to NewCloud
+# Contributing to NexxCloud
 
-Thank you for helping make NewCloud more dependable. The highest-value contributions keep
+Thank you for helping make NexxCloud more dependable. The highest-value contributions keep
 file bytes, metadata, references, and user-visible storage totals consistent even when a
 request fails halfway through.
 
@@ -19,8 +19,8 @@ Read these documents before changing core behavior:
 ### Compose Workflow
 
 ```bash
-git clone https://github.com/ShadowSafin/NewCloud.git
-cd NewCloud
+git clone https://github.com/ShadowSafin/NewCloud.git NexxCloud
+cd NexxCloud
 bash setup.sh
 ```
 

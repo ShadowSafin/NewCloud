@@ -1,4 +1,4 @@
-package com.newcloud.app;
+package com.nexxcloud.app;
 
 import android.os.Bundle;
 import android.graphics.Color;
@@ -19,7 +19,7 @@ public class MainActivity extends BridgeActivity {
         }
 
         WebSettings settings = webView.getSettings();
-        settings.setUserAgentString(settings.getUserAgentString() + " NewCloudMobile");
+        settings.setUserAgentString(settings.getUserAgentString() + " NexxCloudMobile");
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);

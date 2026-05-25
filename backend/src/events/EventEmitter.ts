@@ -10,7 +10,7 @@ import {
   deserializeEvent,
 } from "./types";
 
-const REDIS_PUBSUB_CHANNEL = "cloudstore:events";
+const REDIS_PUBSUB_CHANNEL = "nexxcloud:events";
 
 export class CloudEventEmitter {
   private localEmitter: EventEmitter;

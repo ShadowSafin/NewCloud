@@ -5,11 +5,11 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ENV_FILE="$ROOT_DIR/.env"
 
 info() {
-  printf '%s\n' "[NewCloud] $*"
+  printf '%s\n' "[NexxCloud] $*"
 }
 
 fail() {
-  printf '%s\n' "[NewCloud] ERROR: $*" >&2
+  printf '%s\n' "[NexxCloud] ERROR: $*" >&2
   exit 1
 }
 
@@ -75,26 +75,26 @@ check_port_if_available() {
 
 require_docker
 cd "$ROOT_DIR"
-compose_project_name="${NEWCLOUD_PROJECT_NAME:-newcloud}"
+compose_project_name="${NEXXCLOUD_PROJECT_NAME:-nexxcloud}"
 case "$compose_project_name" in
   *[!a-z0-9_-]*|""|[-_]*)
-    fail "NEWCLOUD_PROJECT_NAME may contain only lowercase letters, digits, underscores, and hyphens, and must begin with a letter or digit."
+    fail "NEXXCLOUD_PROJECT_NAME may contain only lowercase letters, digits, underscores, and hyphens, and must begin with a letter or digit."
     ;;
 esac
-initial_frontend_port="${NEWCLOUD_FRONTEND_PORT:-3000}"
-initial_backend_port="${NEWCLOUD_BACKEND_PORT:-4000}"
-initial_data_dir="${NEWCLOUD_DATA_DIR:-./data}"
+initial_frontend_port="${NEXXCLOUD_FRONTEND_PORT:-3000}"
+initial_backend_port="${NEXXCLOUD_BACKEND_PORT:-4000}"
+initial_data_dir="${NEXXCLOUD_DATA_DIR:-./data}"
 case "$initial_frontend_port:$initial_backend_port" in
   *[!0-9:]*)
-    fail "NEWCLOUD_FRONTEND_PORT and NEWCLOUD_BACKEND_PORT must be numeric ports."
+    fail "NEXXCLOUD_FRONTEND_PORT and NEXXCLOUD_BACKEND_PORT must be numeric ports."
     ;;
 esac
-[ "$initial_frontend_port" -ge 1 ] && [ "$initial_frontend_port" -le 65535 ] || fail "NEWCLOUD_FRONTEND_PORT must be from 1 through 65535."
-[ "$initial_backend_port" -ge 1 ] && [ "$initial_backend_port" -le 65535 ] || fail "NEWCLOUD_BACKEND_PORT must be from 1 through 65535."
+[ "$initial_frontend_port" -ge 1 ] && [ "$initial_frontend_port" -le 65535 ] || fail "NEXXCLOUD_FRONTEND_PORT must be from 1 through 65535."
+[ "$initial_backend_port" -ge 1 ] && [ "$initial_backend_port" -le 65535 ] || fail "NEXXCLOUD_BACKEND_PORT must be from 1 through 65535."
 
 if [ ! -f "$ENV_FILE" ]; then
   lan_ip=$(detect_lan_ip || true)
-  host_name=$(hostname 2>/dev/null || printf 'newcloud')
+  host_name=$(hostname 2>/dev/null || printf 'nexxcloud')
   umask 077
   cat > "$ENV_FILE" <<EOF
 # Generated securely by setup.sh. Back this file up separately from user data.
@@ -104,11 +104,11 @@ FRONTEND_PORT=$initial_frontend_port
 BACKEND_PORT=$initial_backend_port
 FRONTEND_BIND_ADDRESS=0.0.0.0
 BACKEND_BIND_ADDRESS=0.0.0.0
-NEWCLOUD_DATA_DIR=$initial_data_dir
+NEXXCLOUD_DATA_DIR=$initial_data_dir
 
-DB_USER=newcloud
+DB_USER=nexxcloud
 DB_PASSWORD=$(random_hex)
-DB_NAME=newcloud
+DB_NAME=nexxcloud
 
 JWT_SECRET=$(random_hex)
 JWT_REFRESH_SECRET=$(random_hex)
@@ -147,7 +147,7 @@ else
   generate_if_placeholder BULL_BOARD_PASSWORD
 fi
 
-configured_data_dir=$(get_env NEWCLOUD_DATA_DIR)
+configured_data_dir=$(get_env NEXXCLOUD_DATA_DIR)
 [ -n "$configured_data_dir" ] || configured_data_dir="./data"
 case "$configured_data_dir" in
   /*) mkdir -p "$configured_data_dir/storage"; chmod 700 "$configured_data_dir" 2>/dev/null || true ;;

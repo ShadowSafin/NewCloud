@@ -99,7 +99,7 @@ export function SelfHost() {
             The cloud, <span className="text-gradient">on your terms.</span>
           </h2>
           <p className="mt-5 max-w-md text-muted-foreground">
-            NewCloud runs where you do — your homelab, NAS, or VPS.
+            NexxCloud runs where you do — your homelab, NAS, or VPS.
             One compose file. Zero telemetry. Total control.
           </p>
           <div className="mt-8 rounded-2xl border border-border/60 bg-black/40 p-1 apex-shadow-elegant">
@@ -107,8 +107,8 @@ export function SelfHost() {
               <Terminal className="h-3.5 w-3.5" /> bash
             </div>
             <pre className="overflow-x-auto whitespace-pre-wrap break-words p-5 text-xs leading-relaxed sm:text-sm">
-<span className="text-muted-foreground">$</span> git clone https://github.com/ShadowSafin/NewCloud
-<span className="text-muted-foreground">$</span> cd NewCloud
+<span className="text-muted-foreground">$</span> git clone https://github.com/ShadowSafin/NewCloud NexxCloud
+<span className="text-muted-foreground">$</span> cd NexxCloud
 <span className="text-muted-foreground">$</span> docker compose up -d
 
 <span className="text-muted-foreground"># open http://localhost:3000 — that's it.</span>
@@ -375,7 +375,7 @@ export function DevSection() {
 /* ---------- Testimonials ---------- */
 export function Testimonials() {
   const t = [
-    { q: "Replaced three SaaS subscriptions with a single docker compose. NewCloud sparks joy.", n: "Jonas R.", r: "Indie developer" },
+    { q: "Replaced three SaaS subscriptions with a single docker compose. NexxCloud sparks joy.", n: "Jonas R.", r: "Indie developer" },
     { q: "Finally a self-hosted drive that doesn't look like 2011. My team actually opens it.", n: "Sara L.", r: "Design lead" },
     { q: "Chunked uploads mean I can upload huge video files without worrying about timeouts.", n: "Marcus T.", r: "Filmmaker" },
     { q: "The real-time sync and file previews put other self-hosted solutions to shame.", n: "Priya K.", r: "Homelab enthusiast" },
@@ -439,12 +439,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 export function FAQ() {
   const qs: [string, string][] = [
-    ["Is NewCloud open source?", "Yes. NewCloud is open source and developed in the open on GitHub."],
+    ["Is NexxCloud open source?", "Yes. NexxCloud is open source and developed in the open on GitHub."],
     ["Can I self-host it?", "That's the default. Run it on a NAS, a VPS, or any machine with Docker installed."],
     ["Does it support Docker?", "First-class. A single docker compose up starts all five services — frontend, backend, worker, PostgreSQL, and Redis."],
     ["Is it privacy focused?", "By design. Your files stay on your hardware. Zero telemetry, zero tracking."],
     ["Does it support large files?", "Files up to 1TB are supported. Uploads are chunked and resumable, so even huge files won't fail."],
-    ["What file types are supported?", "All of them. NewCloud auto-categorises into 15+ types including images, video, audio, code, 3D models, datasets, and more."],
+    ["What file types are supported?", "All of them. NexxCloud auto-categorises into 15+ types including images, video, audio, code, 3D models, datasets, and more."],
     ["Does it have version history?", "Yes. Every file keeps a version history. You can view and restore previous versions from the UI."],
     ["Can I share files?", "Yes. Generate a public share link for any file with one click. Anyone with the link can view or download."],
   ];
@@ -474,7 +474,7 @@ export function FinalCTA() {
           Take back control <br/>of <span className="text-gradient">your files.</span>
         </h2>
         <p className="mx-auto mt-5 max-w-xl text-muted-foreground">
-          Your files deserve a home you own. NewCloud makes it real — free, open source, and ready in minutes.
+          Your files deserve a home you own. NexxCloud makes it real — free, open source, and ready in minutes.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a href="/register" className="inline-flex items-center gap-2 rounded-full bg-[var(--gradient-brand)] px-6 py-3 text-sm font-medium text-background apex-shadow-glow hover:opacity-90 transition">
@@ -497,7 +497,7 @@ export function Footer() {
         <div>
           <div className="flex items-center gap-2">
             <BrandMark className="h-8 w-8" />
-            <span className="font-display text-lg font-semibold">NewCloud</span>
+            <span className="font-display text-lg font-semibold">NexxCloud</span>
           </div>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">The modern self-hosted cloud storage platform. Own your data.</p>
         </div>
@@ -515,7 +515,7 @@ export function Footer() {
         </div>
       </div>
       <div className="mx-auto mt-10 max-w-7xl border-t border-border/60 pt-6 text-xs text-muted-foreground">
-        © {new Date().getFullYear()} NewCloud. Built for people who own their files.
+        © {new Date().getFullYear()} NexxCloud. Built for people who own their files.
       </div>
     </footer>
   );

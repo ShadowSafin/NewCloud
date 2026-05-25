@@ -6,7 +6,7 @@ export function GET() {
   return NextResponse.json(
     {
       status: "ok",
-      name: "NewCloud Frontend",
+      name: "NexxCloud Frontend",
       timestamp: new Date().toISOString(),
     },
     {

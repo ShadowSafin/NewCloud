@@ -9,7 +9,7 @@
 
 @layer base {
   :root {
-    /* NewCloud Design System - matches landing page */
+    /* NexxCloud Design System - matches landing page */
     --background: oklch(0.16 0.025 265);
     --foreground: oklch(0.97 0.005 250);
     
@@ -476,7 +476,7 @@
 .apex-animate-pulse-glow { animation: apex-pulse-glow 4s ease-in-out infinite }
 
 /* Android WebView keeps video playback on its own surface; avoid repainting it while scrolling. */
-.apex-mobile-shell [data-newcloud-hero-video-layer] {
+.apex-mobile-shell [data-nexxcloud-hero-video-layer] {
   contain: paint;
   backface-visibility: hidden;
 }
@@ -492,13 +492,13 @@
   backface-visibility: hidden;
 }
 
-.apex-mobile-shell [data-newcloud-hero] .apex-hero-grain {
+.apex-mobile-shell [data-nexxcloud-hero] .apex-hero-grain {
   mix-blend-mode: normal;
   opacity: 0.06;
 }
 
-.apex-mobile-shell [data-newcloud-hero] .apex-hero-button,
-.apex-mobile-shell [data-newcloud-hero] .apex-mobile-frost,
+.apex-mobile-shell [data-nexxcloud-hero] .apex-hero-button,
+.apex-mobile-shell [data-nexxcloud-hero] .apex-mobile-frost,
 .apex-mobile-shell .apex-mobile-nav {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;

@@ -234,7 +234,7 @@ function DashboardContent() {
       const message = event.data;
       if (
         !message ||
-        message.source !== "newcloud-mobile-shell" ||
+        message.source !== "nexxcloud-mobile-shell" ||
         message.type !== "native-upload-files" ||
         !Array.isArray(message.files)
       ) {
@@ -243,7 +243,7 @@ function DashboardContent() {
 
       if (!isAuthenticated) {
         addToast("Sign in before uploading from the mobile app", "error");
-        window.parent.postMessage({ source: "newcloud-web", type: "native-upload-rejected" }, "*");
+        window.parent.postMessage({ source: "nexxcloud-web", type: "native-upload-rejected" }, "*");
         return;
       }
 
@@ -257,10 +257,10 @@ function DashboardContent() {
         }
 
         addToast(`Started ${files.length} mobile upload${files.length === 1 ? "" : "s"}`, "success");
-        window.parent.postMessage({ source: "newcloud-web", type: "native-upload-accepted", count: files.length }, "*");
+        window.parent.postMessage({ source: "nexxcloud-web", type: "native-upload-accepted", count: files.length }, "*");
       } catch {
         addToast("Could not import the selected mobile file", "error");
-        window.parent.postMessage({ source: "newcloud-web", type: "native-upload-failed" }, "*");
+        window.parent.postMessage({ source: "nexxcloud-web", type: "native-upload-failed" }, "*");
       }
     };
 

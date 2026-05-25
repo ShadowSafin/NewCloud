@@ -14,15 +14,15 @@ export class MediaAccessService {
   createToken(payload: MediaAccessPayload, expiresIn = "5m"): string {
     return jwt.sign(payload, config.mediaTokenSecret, {
       expiresIn: expiresIn as any,
-      audience: "newcloud-media",
-      issuer: "newcloud-api",
+      audience: "nexxcloud-media",
+      issuer: "nexxcloud-api",
     });
   }
 
   verifyToken(token: string): MediaAccessPayload {
     return jwt.verify(token, config.mediaTokenSecret, {
-      audience: "newcloud-media",
-      issuer: "newcloud-api",
+      audience: "nexxcloud-media",
+      issuer: "nexxcloud-api",
     }) as MediaAccessPayload;
   }
 }

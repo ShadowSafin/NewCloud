@@ -3,8 +3,8 @@
 cloud.example.com {
 	encode zstd gzip
 
-	@newcloud_websocket path /ws
-	reverse_proxy @newcloud_websocket 127.0.0.1:4000
+	@nexxcloud_websocket path /ws
+	reverse_proxy @nexxcloud_websocket 127.0.0.1:4000
 
 	reverse_proxy 127.0.0.1:3000
 }

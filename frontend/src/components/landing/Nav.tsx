@@ -59,7 +59,7 @@ export function Nav({ stableCompositing = false }: { stableCompositing?: boolean
       >
         <a href="/" className={`flex items-center ${stableCompositing ? "gap-2 pl-1" : "gap-2 pl-2"}`}>
           <BrandMark className={`${stableCompositing ? "h-7 w-7 rounded-md" : "h-8 w-8"} apex-shadow-glow`} priority />
-          <span className={`font-display font-semibold ${stableCompositing ? "text-base" : "text-base sm:text-lg"}`}>NewCloud</span>
+          <span className={`font-display font-semibold ${stableCompositing ? "text-base" : "text-base sm:text-lg"}`}>NexxCloud</span>
         </a>
         <nav className="hidden items-center gap-7 text-sm text-white/62 md:flex">
           <a className="transition hover:text-white" href="#features">Features</a>

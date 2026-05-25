@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "NewCloud",
+  title: "NexxCloud",
   description: "Self-hosted cloud storage platform",
   manifest: "/site.webmanifest",
   icons: {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NewCloud",
+    title: "NexxCloud",
   },
 };
 

@@ -7,7 +7,7 @@ import { fileTypeService } from "../src/services/fileTypeService";
 let tempDir: string | undefined;
 
 const writeTempFile = async (name: string, bytes: Buffer) => {
-  tempDir = tempDir || (await mkdtemp(join(tmpdir(), "newcloud-filetype-")));
+  tempDir = tempDir || (await mkdtemp(join(tmpdir(), "nexxcloud-filetype-")));
   const filePath = join(tempDir, name);
   await writeFile(filePath, bytes);
   return filePath;

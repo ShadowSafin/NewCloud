@@ -24,7 +24,7 @@ export function DashboardMock() {
           <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
           <span className="h-2.5 w-2.5 rounded-full bg-green-400/70" />
           <div className="ml-2 flex min-w-0 items-center gap-2 rounded-md bg-white/5 px-3 py-1 text-xs text-muted-foreground sm:ml-4">
-            <Cloud className="h-3.5 w-3.5" /> newcloud.local / drive
+            <Cloud className="h-3.5 w-3.5" /> nexxcloud.local / drive
           </div>
           <div className="ml-auto hidden items-center gap-2 rounded-md bg-white/5 px-3 py-1 text-xs text-muted-foreground sm:flex">
             <Search className="h-3.5 w-3.5" /> Search files…

@@ -7,7 +7,7 @@ import { fileTypeService } from "../services/fileTypeService";
 import { config } from "../config";
 
 // Dangerous file types can be rejected by policy, but are allowed by default
-// so NewCloud can store arbitrary user files while still avoiding inline execution.
+// so NexxCloud can store arbitrary user files while still avoiding inline execution.
 const DANGEROUS_EXTENSIONS = new Set([
   ".exe", ".bat", ".cmd", ".com", ".msi", ".scr", ".pif",
   ".vbs", ".vbe", ".js", ".jse", ".ws", ".wsf", ".wsc",

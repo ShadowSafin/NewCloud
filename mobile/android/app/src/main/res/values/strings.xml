@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">NewCloud</string>
-    <string name="title_activity_main">NewCloud</string>
-    <string name="package_name">com.newcloud.app</string>
-    <string name="custom_url_scheme">newcloud</string>
+    <string name="app_name">NexxCloud</string>
+    <string name="title_activity_main">NexxCloud</string>
+    <string name="package_name">com.nexxcloud.app</string>
+    <string name="custom_url_scheme">nexxcloud</string>
 </resources>

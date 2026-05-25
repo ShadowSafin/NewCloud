@@ -248,7 +248,7 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-xs text-body-mid mb-6 leading-relaxed">
-              NewCloud is accessible to any device on your local network (LAN) such as phones, tablets, or smart TVs. Connect via the local hostname or IP addresses below.
+              NexxCloud is accessible to any device on your local network (LAN) such as phones, tablets, or smart TVs. Connect via the local hostname or IP addresses below.
             </p>
 
             {networkStatus ? (
@@ -356,7 +356,7 @@ export default function SettingsPage() {
               {qrCodeDataUrl ? (
                 <img
                   src={qrCodeDataUrl}
-                  alt="NewCloud Access QR Code"
+                  alt="NexxCloud Access QR Code"
                   className="w-48 h-48 select-none"
                 />
               ) : (
@@ -389,7 +389,7 @@ export default function SettingsPage() {
                 </button>
               </div>
               <p className="text-[10px] text-body-mid leading-relaxed mt-2">
-                Make sure your phone or tablet is connected to the same Wi-Fi network as the NewCloud server.
+                Make sure your phone or tablet is connected to the same Wi-Fi network as the NexxCloud server.
               </p>
             </div>
 

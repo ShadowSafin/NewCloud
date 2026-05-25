@@ -109,7 +109,7 @@ async function sendNotification(type: CloudEventType, data: EventPayload): Promi
 
     try {
       await getCacheClient().publish(
-        `cloudstore:notifications:${data.userId}`,
+        `nexxcloud:notifications:${data.userId}`,
         JSON.stringify({
           id: notification.id,
           type: notification.type,
@@ -281,8 +281,8 @@ function broadcastToWebSocket(type: CloudEventType, data: EventPayload): void {
   try {
     const cacheClient = getCacheClient();
     const channel = data.userId
-      ? `cloudstore:ws:${data.userId}`
-      : "cloudstore:ws:broadcast";
+      ? `nexxcloud:ws:${data.userId}`
+      : "nexxcloud:ws:broadcast";
 
     cacheClient.publish(
       channel,

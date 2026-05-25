@@ -1,6 +1,6 @@
 # Usage:
 #   docker network create proxy
-#   NEWCLOUD_DOMAIN=cloud.example.com docker compose -f docker-compose.yml \
+#   NEXXCLOUD_DOMAIN=cloud.example.com docker compose -f docker-compose.yml \
 #     -f deploy/compose.traefik.yml up -d --build
 #
 # Traefik handles HTTPS and forwards normal traffic to the frontend. WebSocket upgrades
@@ -11,21 +11,21 @@ services:
       - proxy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.newcloud.rule=Host(`${NEWCLOUD_DOMAIN:?Set NEWCLOUD_DOMAIN}`)
-      - traefik.http.routers.newcloud.entrypoints=websecure
-      - traefik.http.routers.newcloud.tls=true
-      - traefik.http.services.newcloud.loadbalancer.server.port=3000
+      - traefik.http.routers.nexxcloud.rule=Host(`${NEXXCLOUD_DOMAIN:?Set NEXXCLOUD_DOMAIN}`)
+      - traefik.http.routers.nexxcloud.entrypoints=websecure
+      - traefik.http.routers.nexxcloud.tls=true
+      - traefik.http.services.nexxcloud.loadbalancer.server.port=3000
 
   backend:
     networks:
       - proxy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.newcloud-ws.rule=Host(`${NEWCLOUD_DOMAIN:?Set NEWCLOUD_DOMAIN}`) && Path(`/ws`)
-      - traefik.http.routers.newcloud-ws.entrypoints=websecure
-      - traefik.http.routers.newcloud-ws.tls=true
-      - traefik.http.routers.newcloud-ws.priority=100
-      - traefik.http.services.newcloud-ws.loadbalancer.server.port=4000
+      - traefik.http.routers.nexxcloud-ws.rule=Host(`${NEXXCLOUD_DOMAIN:?Set NEXXCLOUD_DOMAIN}`) && Path(`/ws`)
+      - traefik.http.routers.nexxcloud-ws.entrypoints=websecure
+      - traefik.http.routers.nexxcloud-ws.tls=true
+      - traefik.http.routers.nexxcloud-ws.priority=100
+      - traefik.http.services.nexxcloud-ws.loadbalancer.server.port=4000
 
 networks:
   proxy:
