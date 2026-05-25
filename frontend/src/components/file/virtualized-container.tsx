@@ -46,17 +46,30 @@ export function VirtualizedContainer<T>({
     };
   }, []);
 
-  const cols = useMemo(() => {
-    if (viewMode === "list") return 1;
-    if (containerWidth >= 1024) return 5; // lg
-    if (containerWidth >= 768) return 4;  // md
-    if (containerWidth >= 640) return 3;  // sm
-    return 2;
+  const gap = 12; // gap-3 in pixels
+
+  const { cols, itemHeight } = useMemo(() => {
+    if (viewMode === "list") {
+      return { cols: 1, itemHeight: 54 };
+    }
+
+    if (containerWidth >= 1024) return { cols: 5, itemHeight: 172 };
+    if (containerWidth >= 768) return { cols: 4, itemHeight: 172 };
+    if (containerWidth >= 640) return { cols: 3, itemHeight: 178 };
+
+    const minCardWidth = containerWidth < 380 ? 138 : 150;
+    const derivedCols = Math.max(1, Math.floor((containerWidth + gap) / (minCardWidth + gap)));
+    const mobileCols = Math.min(2, derivedCols);
+    return {
+      cols: mobileCols,
+      itemHeight: mobileCols === 1 ? 224 : 210,
+    };
   }, [containerWidth, viewMode]);
 
-  // Card dimensions
-  const itemHeight = viewMode === "list" ? 54 : 172; // height for FileCard & FolderCard
-  const gap = 12; // gap-3 in pixels
+  const maxHeight = containerWidth < 768
+    ? "calc(100dvh - 236px)"
+    : "calc(100dvh - 200px)";
+
   const totalRows = Math.ceil(items.length / cols);
   const totalHeight = totalRows * itemHeight + Math.max(0, totalRows - 1) * gap;
 
@@ -115,7 +128,7 @@ export function VirtualizedContainer<T>({
     <div
       ref={containerRef}
       className="w-full h-full overflow-y-auto relative pr-1"
-      style={{ maxHeight: "calc(100vh - 200px)" }}
+      style={{ maxHeight }}
     >
       <div
         className="w-full relative"

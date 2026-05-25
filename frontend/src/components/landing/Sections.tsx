@@ -23,7 +23,7 @@ export function SectionHeading({ eyebrow, title, sub }: { eyebrow: string; title
       <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border/60 bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground">
         <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-cyan)]" /> {eyebrow}
       </div>
-      <h2 className="font-display text-4xl font-semibold tracking-tight md:text-5xl">{title}</h2>
+      <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">{title}</h2>
       {sub && <p className="mt-4 text-balance text-muted-foreground">{sub}</p>}
     </motion.div>
   );
@@ -47,7 +47,7 @@ const features = [
 
 export function Features() {
   return (
-    <section id="features" className="relative mx-auto max-w-7xl px-6 py-28">
+    <section id="features" className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading
         eyebrow="Features"
         title="Everything your files deserve."
@@ -88,13 +88,13 @@ export function SelfHost() {
     { icon: Network, title: "Background Workers", desc: "Thumbnails, deduplication, and trash cleanup — all handled automatically." },
   ];
   return (
-    <section id="self-host" className="relative mx-auto max-w-7xl px-6 py-28">
+    <section id="self-host" className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <div className="grid items-start gap-12 lg:grid-cols-2">
         <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}>
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border/60 bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-violet)]" /> Self-Hosting
           </div>
-          <h2 className="font-display text-4xl font-semibold tracking-tight md:text-5xl">
+          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
             The cloud, <span className="text-gradient">on your terms.</span>
           </h2>
           <p className="mt-5 max-w-md text-muted-foreground">
@@ -105,7 +105,7 @@ export function SelfHost() {
             <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
               <Terminal className="h-3.5 w-3.5" /> bash
             </div>
-            <pre className="overflow-x-auto p-5 text-sm leading-relaxed">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words p-5 text-xs leading-relaxed sm:text-sm">
 <span className="text-muted-foreground">$</span> git clone https://github.com/ShadowSafin/NewCloud
 <span className="text-muted-foreground">$</span> cd NewCloud
 <span className="text-muted-foreground">$</span> docker compose up -d
@@ -144,7 +144,7 @@ export function HowItWorks() {
     { n: "03", icon: Globe, t: "Access Anywhere", d: "Open the web UI from any browser. Your files are always a tab away." },
   ];
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-28">
+    <section className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading eyebrow="How it works" title="Three steps. One cloud." />
       <div className="relative grid gap-6 md:grid-cols-3">
         <div className="absolute left-0 right-0 top-12 hidden h-px bg-gradient-to-r from-transparent via-white/15 to-transparent md:block" />
@@ -177,7 +177,7 @@ export function Performance() {
     { k: "Live", l: "WebSocket sync" },
   ];
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-28">
+    <section className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading
         eyebrow="Performance"
         title="Built for real workloads."
@@ -247,7 +247,7 @@ function Sparkline() {
 /* ---------- File Management ---------- */
 export function Collaboration() {
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-28">
+    <section className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <div className="grid items-center gap-12 lg:grid-cols-2">
         <div className="order-2 lg:order-1">
           <div className="rounded-2xl apex-glass p-6 apex-shadow-elegant">
@@ -276,7 +276,7 @@ export function Collaboration() {
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border/60 bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-cyan)]" /> File Management
           </div>
-          <h2 className="font-display text-4xl font-semibold tracking-tight md:text-5xl">
+          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
             Organise your files <span className="text-gradient">effortlessly.</span>
           </h2>
           <p className="mt-5 max-w-md text-muted-foreground">
@@ -302,7 +302,7 @@ export function AISection() {
     { i: Zap, t: "WebSocket Events", d: "Real-time file change notifications across all tabs." },
   ];
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-28">
+    <section className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading eyebrow="Tech Stack" title="Modern infrastructure, no shortcuts." sub="Built on proven open-source technologies you already know." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {items.map((x, i) => (
@@ -322,13 +322,13 @@ export function AISection() {
 /* ---------- Dev ---------- */
 export function DevSection() {
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-28">
+    <section className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <div className="grid items-center gap-12 lg:grid-cols-2">
         <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}>
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border/60 bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground">
             <Code2 className="h-3.5 w-3.5" /> Built for developers
           </div>
-          <h2 className="font-display text-4xl font-semibold tracking-tight md:text-5xl">Open source & extensible.</h2>
+          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">Open source & extensible.</h2>
           <p className="mt-5 max-w-md text-muted-foreground">
             A REST API for every operation, a clean TypeScript codebase, and a modular architecture you can extend.
           </p>
@@ -350,7 +350,7 @@ export function DevSection() {
           <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2 text-xs text-muted-foreground">
             <Terminal className="h-3.5 w-3.5" /> REST API
           </div>
-          <pre className="overflow-x-auto p-5 text-sm leading-relaxed">
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words p-5 text-xs leading-relaxed sm:text-sm">
 <span className="text-muted-foreground"># Upload a file (chunked)</span>
 <span className="text-[var(--brand-violet)]">POST</span> <span className="text-[var(--brand-cyan)]">/api/uploads/initiate</span>
 <span className="text-[var(--brand-violet)]">POST</span> <span className="text-[var(--brand-cyan)]">/api/uploads/:id/chunk/:index</span>
@@ -380,7 +380,7 @@ export function Testimonials() {
     { q: "The real-time sync and file previews put other self-hosted solutions to shame.", n: "Priya K.", r: "Homelab enthusiast" },
   ];
   return (
-    <section className="relative mx-auto max-w-7xl px-6 py-28">
+    <section className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading eyebrow="Loved by self-hosters" title="A community that ships." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {t.map((x, i) => (
@@ -404,7 +404,7 @@ export function Testimonials() {
 /* ---------- Pricing ---------- */
 export function Pricing() {
   return (
-    <section id="pricing" className="relative mx-auto max-w-3xl px-6 py-28">
+    <section id="pricing" className="relative mx-auto max-w-3xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading eyebrow="Pricing" title="Free. Self-hosted. Yours." />
       <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={fadeUp}
         className="relative rounded-2xl border border-transparent bg-[linear-gradient(180deg,oklch(0.82_0.16_200_/_0.12),oklch(0.68_0.22_295_/_0.06))] ring-1 ring-[var(--brand-cyan)]/40 p-8 apex-shadow-card text-center">
@@ -448,7 +448,7 @@ export function FAQ() {
     ["Can I share files?", "Yes. Generate a public share link for any file with one click. Anyone with the link can view or download."],
   ];
   return (
-    <section id="faq" className="relative mx-auto max-w-3xl px-6 py-28">
+    <section id="faq" className="relative mx-auto max-w-3xl px-4 py-24 sm:px-6 sm:py-28">
       <SectionHeading eyebrow="FAQ" title="Questions, answered." />
       <Accordion type="single" collapsible className="w-full">
         {qs.map(([q, a], i) => (
@@ -465,7 +465,7 @@ export function FAQ() {
 /* ---------- CTA ---------- */
 export function FinalCTA() {
   return (
-    <section id="cta" className="relative mx-auto max-w-6xl px-6 py-32">
+    <section id="cta" className="relative mx-auto max-w-6xl px-4 py-28 sm:px-6 sm:py-32">
       <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-white/[0.02] p-12 text-center apex-shadow-elegant md:p-20">
         <div className="absolute inset-0 -z-10 bg-grid opacity-50" />
         <div className="absolute -top-32 left-1/2 -z-10 h-80 w-[700px] -translate-x-1/2 rounded-full bg-[var(--gradient-brand)] opacity-30 blur-3xl" />

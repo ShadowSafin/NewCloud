@@ -4,22 +4,30 @@
   "description": "NewCloud Mobile Wrapper",
   "private": true,
   "scripts": {
-    "build": "echo 'No build step required'"
+    "build": "tsc --noEmit",
+    "sync": "npx cap sync",
+    "android:sync": "npx cap sync android",
+    "android:apk": "npm run android:sync && powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 assembleDebug",
+    "android:aab": "npm run android:sync && powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 bundleDebug",
+    "ios:sync": "npx cap sync ios",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios"
   },
   "dependencies": {
-    "@capacitor/core": "^6.2.0",
     "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/camera": "^6.1.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.2",
+    "@capacitor/haptics": "^6.0.2",
     "@capacitor/ios": "^6.2.0",
-    "@capacitor/status-bar": "^6.0.2",
-    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/keyboard": "^6.0.4",
     "@capacitor/network": "^6.0.2",
     "@capacitor/preferences": "^6.0.2",
-    "@capacitor/camera": "^6.1.2",
-    "@capacitor/filesystem": "^6.0.2",
+    "@capacitor/push-notifications": "^6.0.5",
     "@capacitor/share": "^6.0.2",
-    "@capacitor/haptics": "^6.0.2",
-    "@capacitor/barcode-scanner": "^1.0.3",
-    "@capacitor/app": "^6.0.2"
+    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/status-bar": "^6.0.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0",

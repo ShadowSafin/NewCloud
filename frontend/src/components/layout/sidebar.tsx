@@ -170,14 +170,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       {/* Backdrop overlay on mobile when drawer is open */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/68 backdrop-blur-sm z-40 md:hidden"
           onClick={onClose}
         />
       )}
 
       <aside 
         className={cn(
-          "w-56 h-full border-r border-white/[0.06] bg-[#090616]/98 md:bg-black/15 flex flex-col shrink-0 transition-transform duration-300 ease-in-out z-50",
+          "h-full w-[82vw] max-w-[320px] border-r border-white/[0.06] bg-[#090616]/98 shadow-[24px_0_80px_rgba(0,0,0,0.6)] md:w-56 md:bg-black/15 md:shadow-none flex flex-col shrink-0 transition-transform duration-300 ease-in-out will-change-transform z-50",
           "fixed inset-y-0 left-0 md:relative md:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}

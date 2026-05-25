@@ -178,7 +178,7 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#04020a] relative flex flex-col overflow-hidden">
+    <div className="relative flex h-[100dvh] min-h-screen w-full max-w-full flex-col overflow-hidden bg-[#04020a]">
       {/* Background Gradients & Grid Pattern */}
       <div className="absolute inset-0 bg-grid opacity-20 pointer-events-none" />
       <div className="absolute top-[-10%] left-[20%] w-[700px] h-[700px] rounded-full bg-purple-900/10 blur-[150px] pointer-events-none animate-pulse-glow md:block hidden" />
@@ -197,7 +197,7 @@ export function AppShell({ children }: AppShellProps) {
         {/* Sidebar + Main content split */}
         <div className="flex-1 flex overflow-hidden min-h-0">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <div className="flex-1 flex flex-col overflow-hidden min-h-0 bg-black/10">
+          <div className="flex-1 flex flex-col overflow-hidden overflow-x-hidden min-h-0 bg-black/10">
             {mainContent}
           </div>
         </div>

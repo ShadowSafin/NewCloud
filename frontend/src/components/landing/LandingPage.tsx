@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { ArrowRight, Github, PlayCircle, ShieldCheck, Server, Zap } from "lucide-react";
 import { AmbientBackground } from "./Background";
@@ -39,6 +39,8 @@ export function LandingPage() {
 function Hero() {
   const heroRef = useRef<HTMLElement | null>(null);
   const shouldReduceMotion = Boolean(useReducedMotion());
+  const isMobileShell = useMobileShell();
+  const stabilizeVideoLayer = shouldReduceMotion || isMobileShell;
   const { scrollYProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
@@ -49,19 +51,19 @@ function Hero() {
     mass: 0.35,
   });
 
-  const glowY = useTransform(cinematicProgress, [0, 1], shouldReduceMotion ? ["0%", "0%"] : ["0%", "5%"]);
+  const glowY = useTransform(cinematicProgress, [0, 1], stabilizeVideoLayer ? ["0%", "0%"] : ["0%", "5%"]);
   const glowOpacity = useTransform(cinematicProgress, [0, 0.75, 1], [0.75, 0.5, 0.18]);
-  const videoY = useTransform(cinematicProgress, [0, 1], shouldReduceMotion ? ["0%", "0%"] : ["0%", "12%"]);
-  const videoScale = useTransform(cinematicProgress, [0, 1], shouldReduceMotion ? [1.08, 1.08] : [1.08, 1.22]);
-  const videoOpacity = useTransform(cinematicProgress, [0, 0.72, 1], [0.95, 0.74, 0.2]);
+  const videoY = useTransform(cinematicProgress, [0, 1], stabilizeVideoLayer ? ["0%", "0%"] : ["0%", "12%"]);
+  const videoScale = useTransform(cinematicProgress, [0, 1], stabilizeVideoLayer ? [1.05, 1.05] : [1.08, 1.22]);
+  const videoOpacity = useTransform(cinematicProgress, [0, 0.72, 1], stabilizeVideoLayer ? [0.92, 0.92, 0.86] : [0.95, 0.74, 0.2]);
   const overlayOpacity = useTransform(cinematicProgress, [0, 1], [0.62, 0.9]);
-  const textY = useTransform(cinematicProgress, [0, 0.46], shouldReduceMotion ? [0, 0] : [0, -158]);
+  const textY = useTransform(cinematicProgress, [0, 0.46], stabilizeVideoLayer ? [0, 0] : [0, -158]);
   const textOpacity = useTransform(cinematicProgress, [0, 0.28, 0.46], [1, 0.74, 0]);
-  const textScale = useTransform(cinematicProgress, [0, 0.5], shouldReduceMotion ? [1, 1] : [1, 0.96]);
-  const dashboardY = useTransform(cinematicProgress, [0, 0.56, 1], shouldReduceMotion ? [0, 0, 0] : [72, -154, -118]);
+  const textScale = useTransform(cinematicProgress, [0, 0.5], stabilizeVideoLayer ? [1, 1] : [1, 0.96]);
+  const dashboardY = useTransform(cinematicProgress, [0, 0.56, 1], stabilizeVideoLayer ? [0, 0, 0] : [72, -154, -118]);
   const dashboardScale = useTransform(cinematicProgress, [0, 0.42, 1], [0.93, 1, 0.98]);
   const dashboardOpacity = useTransform(cinematicProgress, [0, 0.16, 0.82, 1], [0, 1, 0.96, 0.74]);
-  const dashboardRotateX = useTransform(cinematicProgress, [0, 0.62, 1], shouldReduceMotion ? [0, 0, 0] : [8, -5, -2]);
+  const dashboardRotateX = useTransform(cinematicProgress, [0, 0.62, 1], stabilizeVideoLayer ? [0, 0, 0] : [8, -5, -2]);
 
   return (
     <section ref={heroRef} className="relative md:min-h-[230vh]">
@@ -69,13 +71,14 @@ function Hero() {
         <motion.div
           aria-hidden
           style={{ y: glowY, opacity: glowOpacity }}
-          className="absolute inset-0 bg-[radial-gradient(ellipse_90%_64%_at_50%_16%,rgba(100,210,255,0.24),transparent_58%),linear-gradient(130deg,rgba(37,99,235,0.16),transparent_34%,rgba(168,85,247,0.14)_72%,transparent)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_64%_at_50%_16%,rgba(100,210,255,0.24),transparent_58%),linear-gradient(130deg,rgba(37,99,235,0.16),transparent_34%,rgba(168,85,247,0.14)_72%,transparent)]"
         />
 
         <motion.div
           aria-hidden
+          data-newcloud-hero-video-layer
           style={{ y: videoY, scale: videoScale, opacity: videoOpacity }}
-          className="absolute inset-[-8%] will-change-transform"
+          className="pointer-events-none absolute inset-[-8%] will-change-transform"
         >
           {shouldReduceMotion ? (
             <img
@@ -85,30 +88,19 @@ function Hero() {
               draggable={false}
             />
           ) : (
-            <video
-              className="h-full w-full scale-105 object-cover object-center"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster="/media/newcloud-hero-poster.jpg"
-              aria-hidden
-            >
-              <source src="/media/newcloud-hero.mp4" type="video/mp4" />
-            </video>
+            <HeroVideo key={isMobileShell ? "mobile-shell" : "browser"} preferMobileSources={isMobileShell} />
           )}
         </motion.div>
 
         <motion.div
           aria-hidden
           style={{ opacity: overlayOpacity }}
-          className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,12,0.56)_0%,rgba(5,7,17,0.5)_38%,rgba(8,10,22,0.86)_100%)]"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,12,0.56)_0%,rgba(5,7,17,0.5)_38%,rgba(8,10,22,0.86)_100%)]"
         />
-        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_70%_38%_at_50%_44%,transparent_0%,rgba(0,0,0,0.34)_72%,rgba(0,0,0,0.76)_100%)]" />
-        <div aria-hidden className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.55),transparent_18%,transparent_82%,rgba(0,0,0,0.55))]" />
-        <div aria-hidden className="absolute inset-0 bg-black/10 backdrop-blur-[1px]" />
-        <div aria-hidden className="apex-hero-grain absolute inset-0 opacity-[0.16]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_38%_at_50%_44%,transparent_0%,rgba(0,0,0,0.34)_72%,rgba(0,0,0,0.76)_100%)]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.55),transparent_18%,transparent_82%,rgba(0,0,0,0.55))]" />
+        <div aria-hidden className={isMobileShell ? "pointer-events-none absolute inset-0 bg-black/16" : "pointer-events-none absolute inset-0 bg-black/10 backdrop-blur-[1px]"} />
+        <div aria-hidden className="apex-hero-grain pointer-events-none absolute inset-0 opacity-[0.16]" />
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100svh-6rem)] max-w-7xl flex-col items-center justify-start pt-[3vh] text-center md:min-h-[calc(100vh-7rem)] md:pt-[8vh]">
           <motion.div
@@ -196,6 +188,126 @@ function Hero() {
 
       <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 right-0 hidden h-56 bg-gradient-to-b from-transparent via-[var(--canvas)]/72 to-[var(--canvas)] md:block" />
     </section>
+  );
+}
+
+function useMobileShell() {
+  const [isMobileShell, setIsMobileShell] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setIsMobileShell(
+      window.parent !== window ||
+      params.get("newcloudMobile") === "1" ||
+      /NewCloudMobile|Capacitor/i.test(window.navigator.userAgent)
+    );
+  }, []);
+
+  return isMobileShell;
+}
+
+function HeroVideo({ preferMobileSources }: { preferMobileSources: boolean }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const markReady = () => {
+      setReady(true);
+    };
+    const startPlayback = () => {
+      video.muted = true;
+      video.defaultMuted = true;
+      video.playsInline = true;
+      const playPromise = video.play();
+      if (playPromise) {
+        playPromise.then(markReady).catch(() => {
+          retryTimer = setTimeout(startPlayback, 700);
+        });
+      }
+    };
+
+    video.addEventListener("loadeddata", markReady);
+    video.addEventListener("canplay", markReady);
+    video.addEventListener("playing", markReady);
+
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.load();
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      markReady();
+    }
+    startPlayback();
+
+    const retryOnVisible = () => {
+      if (!document.hidden) startPlayback();
+    };
+
+    document.addEventListener("visibilitychange", retryOnVisible);
+    window.addEventListener("touchstart", startPlayback, { passive: true, once: true });
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+      video.removeEventListener("loadeddata", markReady);
+      video.removeEventListener("canplay", markReady);
+      video.removeEventListener("playing", markReady);
+      document.removeEventListener("visibilitychange", retryOnVisible);
+      window.removeEventListener("touchstart", startPlayback);
+    };
+  }, [preferMobileSources]);
+
+  if (failed) {
+    return (
+      <img
+        src="/media/newcloud-hero-poster.jpg"
+        alt=""
+        className="h-full w-full scale-105 object-cover object-center"
+        draggable={false}
+      />
+    );
+  }
+
+  return (
+    <>
+      <img
+        src="/media/newcloud-hero-poster.jpg"
+        alt=""
+        className={`absolute inset-0 h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
+        draggable={false}
+      />
+      <video
+        ref={videoRef}
+        className={`h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready || preferMobileSources ? "opacity-100" : "opacity-0"}`}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload={preferMobileSources ? "auto" : "metadata"}
+        poster="/media/newcloud-hero-poster.jpg"
+        disablePictureInPicture
+        aria-hidden
+        onError={() => setFailed(true)}
+      >
+        {preferMobileSources ? (
+          <>
+            <source src="/media/newcloud-hero-android.mp4" type="video/mp4" />
+            <source src="/media/newcloud-hero.webm" type="video/webm" />
+            <source src="/media/newcloud-hero.mp4" type="video/mp4" />
+          </>
+        ) : (
+          <>
+            <source src="/media/newcloud-hero.mp4" type="video/mp4" />
+            <source src="/media/newcloud-hero-android.mp4" type="video/mp4" />
+            <source src="/media/newcloud-hero.webm" type="video/webm" />
+          </>
+        )}
+      </video>
+    </>
   );
 }
 

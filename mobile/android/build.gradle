@@ -21,7 +21,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://pkgs.dev.azure.com/OutSystemsRD/OSBarcode/_packaging/OSBarcode/maven/v1' }
         maven { url 'https://jitpack.io' }
     }
 }

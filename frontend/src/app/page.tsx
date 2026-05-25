@@ -46,6 +46,34 @@ interface CategoryDef {
   borderHoverClass: string;
 }
 
+interface NativeUploadFilePayload {
+  name: string;
+  mimeType: string;
+  dataUrl?: string;
+  file?: File;
+}
+
+async function nativePayloadToFile(payload: NativeUploadFilePayload): Promise<File> {
+  if (payload.file && typeof payload.file.arrayBuffer === "function") {
+    const sourceFile = payload.file;
+    return sourceFile.name
+      ? sourceFile
+      : new File([sourceFile], payload.name || "mobile-upload", {
+          type: payload.mimeType || sourceFile.type || "application/octet-stream",
+        });
+  }
+
+  if (!payload.dataUrl) {
+    throw new Error("Missing native upload payload");
+  }
+
+  const response = await fetch(payload.dataUrl);
+  const blob = await response.blob();
+  return new File([blob], payload.name, {
+    type: payload.mimeType || blob.type || "application/octet-stream",
+  });
+}
+
 const CATEGORY_DEFS: CategoryDef[] = [
   {
     id: "projects",
@@ -119,14 +147,13 @@ function CategoryCard({
     <button
       onClick={onClick}
       className={[
-        "group relative flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border transition-all duration-300 cursor-pointer select-none text-left",
+        "group relative flex min-w-[96px] flex-none flex-col items-center justify-center gap-2.5 rounded-2xl border p-4 text-left transition-all duration-300 cursor-pointer select-none sm:min-w-0 sm:flex-1 sm:gap-3 sm:p-5",
         "glass-card",
         def.borderHoverClass,
         isActive
           ? `border-white/20 shadow-[0_0_25px_rgba(255,255,255,0.1)] ${def.bgClass}`
           : "border-white/[0.06]",
       ].join(" ")}
-      style={{ flex: "1 1 0", minWidth: 0 }}
     >
       {/* Active indicator glow ring */}
       {isActive && (
@@ -145,8 +172,8 @@ function CategoryCard({
 
       {/* Label + count */}
       <div className="text-center">
-        <p className="text-sm font-semibold text-white/90 group-hover:text-white leading-tight">{def.label}</p>
-        <p className="text-[11px] text-white/40 mt-0.5 font-mono">
+        <p className="text-[13px] font-semibold leading-tight text-white/90 group-hover:text-white sm:text-sm">{def.label}</p>
+        <p className="mt-0.5 text-[10px] text-white/40 font-mono sm:text-[11px]">
           {count} {count === 1 ? "item" : "items"}
         </p>
       </div>
@@ -173,7 +200,7 @@ function DashboardContent() {
     cut: clipboardCut,
   } = useClipboardStore();
   const { addToast } = useToastStore();
-  const { recoverUploads } = useUploadStore();
+  const { recoverUploads, addUpload } = useUploadStore();
   const { menu: bgContextMenu, open: openBgContextMenu, close: closeBgContextMenu } = useContextMenu();
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -190,18 +217,61 @@ function DashboardContent() {
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
 
+  const isSpecialView = !!view;
+  const isTrashView = view === "trash";
+  const isRecentView = view === "recent";
+  const isStarredView = view === "starred";
+
   // Cancel stale uploads on page load
   useEffect(() => { recoverUploads(); }, [recoverUploads]);
+
+  // Native mobile shell bridge. The Capacitor wrapper can pass camera/gallery
+  // files to the existing upload queue without duplicating any file-manager UI.
+  useEffect(() => {
+    const handleNativeMessage = async (event: MessageEvent) => {
+      if (window.parent === window || event.source !== window.parent) return;
+
+      const message = event.data;
+      if (
+        !message ||
+        message.source !== "newcloud-mobile-shell" ||
+        message.type !== "native-upload-files" ||
+        !Array.isArray(message.files)
+      ) {
+        return;
+      }
+
+      if (!isAuthenticated) {
+        addToast("Sign in before uploading from the mobile app", "error");
+        window.parent.postMessage({ source: "newcloud-web", type: "native-upload-rejected" }, "*");
+        return;
+      }
+
+      try {
+        const files = await Promise.all(
+          message.files.map((file: NativeUploadFilePayload) => nativePayloadToFile(file))
+        );
+
+        for (const file of files) {
+          await addUpload(file, isSpecialView ? undefined : store.currentFolderId || undefined);
+        }
+
+        addToast(`Started ${files.length} mobile upload${files.length === 1 ? "" : "s"}`, "success");
+        window.parent.postMessage({ source: "newcloud-web", type: "native-upload-accepted", count: files.length }, "*");
+      } catch {
+        addToast("Could not import the selected mobile file", "error");
+        window.parent.postMessage({ source: "newcloud-web", type: "native-upload-failed" }, "*");
+      }
+    };
+
+    window.addEventListener("message", handleNativeMessage);
+    return () => window.removeEventListener("message", handleNativeMessage);
+  }, [addToast, addUpload, isAuthenticated, isSpecialView, store.currentFolderId]);
 
   // Clear category filter when navigating to a special view
   useEffect(() => {
     if (view) setActiveCategoryFilter(null);
   }, [view]);
-
-  const isSpecialView = !!view;
-  const isTrashView = view === "trash";
-  const isRecentView = view === "recent";
-  const isStarredView = view === "starred";
 
   const currentDisplayFiles = isSpecialView ? viewFiles : store.files;
 
@@ -525,10 +595,10 @@ function DashboardContent() {
         onSearchChange={setLocalSearch}
       />
 
-      <main className="flex-1 overflow-auto" onContextMenu={handleBgContextMenu}>
-        <div className="p-6 space-y-5">
+      <main className="flex-1 overflow-auto overflow-x-hidden" onContextMenu={handleBgContextMenu}>
+        <div className="space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
           {/* Navigation bar */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <button
               onClick={handleBack}
               disabled={store.historyIndex <= 0}
@@ -556,7 +626,7 @@ function DashboardContent() {
                 <h1 className="text-xl font-semibold text-white tracking-tight">My Drive</h1>
                 <button
                   onClick={() => setIsUploadOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-400/30 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-400/60 text-cyan-300 text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                  className="flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/5 px-3.5 py-2 text-xs font-medium text-cyan-300 transition-all duration-300 hover:border-cyan-400/60 hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] sm:gap-2 sm:px-4 sm:text-sm"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   Upload
@@ -564,7 +634,7 @@ function DashboardContent() {
               </div>
 
               {/* Category Shortcut Cards */}
-              <div className="flex gap-3 flex-wrap sm:flex-nowrap">
+              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 no-scrollbar sm:mx-0 sm:flex-nowrap sm:overflow-visible sm:px-0">
                 {CATEGORY_DEFS.map((def) => (
                   <CategoryCard
                     key={def.id}

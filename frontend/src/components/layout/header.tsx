@@ -107,9 +107,9 @@ export function Header({ onUploadClick, onNewFolderClick, onSearchChange, onTogg
   const currentFolderName = breadcrumb.length > 0 ? breadcrumb[breadcrumb.length - 1]?.name : null;
 
   return (
-    <header className="h-14 md:h-14 py-2.5 md:py-0 border-b border-white/[0.06] bg-black/25 backdrop-blur-md flex items-center justify-between px-3 sm:px-6 shrink-0 relative z-20 safe-pt">
+    <header className="min-h-14 border-b border-white/[0.06] bg-black/25 px-2.5 py-2.5 backdrop-blur-md sm:px-6 md:h-14 md:py-0 flex items-center justify-between shrink-0 relative z-20 safe-pt">
       {/* Left: Hamburger menu, macOS dots & dynamic Address Bar */}
-      <div className="flex items-center gap-2 md:gap-4">
+      <div className="flex items-center gap-1.5 md:gap-4">
         {/* Hamburger Menu Icon for Mobile */}
         <button
           onClick={onToggleSidebar}
@@ -141,17 +141,17 @@ export function Header({ onUploadClick, onNewFolderClick, onSearchChange, onTogg
         </div>
 
         {/* Mobile Address Bar (Simplified) */}
-        <div className="flex md:hidden items-center gap-1 px-2.5 py-1 rounded-full bg-black/35 border border-white/[0.05] text-[10px] text-white/90">
-          <span className="text-white/70 font-semibold truncate max-w-[90px]">
+        <div className="flex md:hidden items-center gap-1 px-2 py-1 rounded-full bg-black/35 border border-white/[0.05] text-[10px] text-white/90">
+          <span className="text-white/70 font-semibold truncate max-w-[76px] sm:max-w-[110px]">
             {currentFolderName || pathText}
           </span>
         </div>
       </div>
 
       {/* Right: Search, Tools, and Profile logout */}
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
         {/* Search Input */}
-        <div className="relative flex items-center w-24 min-w-[90px] xs:w-36 sm:w-56 transition-all duration-300">
+        <div className="relative flex items-center w-24 min-w-[82px] transition-all duration-300 sm:w-40 md:w-56 max-[380px]:hidden">
           <Search className="absolute left-2.5 w-3.5 h-3.5 text-white/40 pointer-events-none" />
           <input
             type="text"
@@ -171,7 +171,7 @@ export function Header({ onUploadClick, onNewFolderClick, onSearchChange, onTogg
         </div>
 
         {/* View mode toggle */}
-        <div className="flex items-center bg-white/[0.02] border border-white/[0.06] rounded-full p-0.5">
+        <div className="flex items-center bg-white/[0.02] border border-white/[0.06] rounded-full p-0.5 max-[380px]:hidden">
           <button
             onClick={() => setViewMode("grid")}
             className={`p-1.5 rounded-full transition-all ${viewMode === "grid" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}

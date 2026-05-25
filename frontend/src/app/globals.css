@@ -67,6 +67,8 @@
     color: var(--ink);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-weight: 400;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-image:
@@ -481,13 +483,15 @@
 
 /* --- Mobile Responsive & Safe Area Enhancements --- */
 @media (max-width: 768px) {
-  html, body {
-    /* Prevent bouncing and rubber-banding */
-    overscroll-behavior-y: contain;
-    /* Touch optimizations */
-    touch-action: manipulation;
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
-  
+
   /* Tap highlighting */
   * {
     -webkit-tap-highlight-color: transparent;
@@ -536,5 +540,46 @@
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+
+  .apex-root,
+  .apex-body {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  .apex-root * {
+    min-width: 0;
+  }
+
+  .apex-root section,
+  .apex-root footer,
+  .apex-root main {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  .apex-root h1,
+  .apex-root h2,
+  .apex-root h3,
+  .apex-root p,
+  .apex-root li {
+    max-width: 100%;
+    overflow-wrap: break-word;
+  }
+
+  .apex-root pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.7;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .apex-root pre span {
+    white-space: pre;
   }
 }
