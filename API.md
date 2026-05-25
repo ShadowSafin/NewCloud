@@ -77,16 +77,17 @@ Common status codes:
 
 ## Health and Administration
 
-| Method | Endpoint        | Auth       | Purpose                                      |
-| ------ | --------------- | ---------- | -------------------------------------------- |
-| `GET`  | `/health`       | None       | Process readiness response outside `/api`.   |
-| `GET`  | `/api/health`   | None       | Same health response through the API prefix. |
-| `GET`  | `/admin/queues` | HTTP Basic | Bull Board queue administration interface.   |
+| Method | Endpoint        | Auth       | Purpose                                                               |
+| ------ | --------------- | ---------- | --------------------------------------------------------------------- |
+| `GET`  | `/health`       | None       | API process liveness response outside `/api`.                         |
+| `GET`  | `/api/health`   | None       | Liveness response through the API prefix.                             |
+| `GET`  | `/health/ready` | None       | Deployment readiness: PostgreSQL, Redis, and storage must be usable. |
+| `GET`  | `/admin/queues` | HTTP Basic | Bull Board queue administration interface.                            |
 
 Example:
 
 ```bash
-curl http://localhost:4000/health
+curl http://localhost:4000/health/ready
 ```
 
 ## Authentication

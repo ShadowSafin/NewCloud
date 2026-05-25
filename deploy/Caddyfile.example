@@ -1,0 +1,10 @@
+# Replace cloud.example.com with your HTTPS hostname.
+# Keep the frontend path same-origin; only the WebSocket upgrade reaches the API directly.
+cloud.example.com {
+	encode zstd gzip
+
+	@newcloud_websocket path /ws
+	reverse_proxy @newcloud_websocket 127.0.0.1:4000
+
+	reverse_proxy 127.0.0.1:3000
+}

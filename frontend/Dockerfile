@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -15,7 +15,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ARG NEXT_PUBLIC_API_URL=
-ARG INTERNAL_API_URL=http://cloud-backend:4000
+ARG INTERNAL_API_URL=http://backend:4000
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_API_URL=""
-ENV INTERNAL_API_URL=http://cloud-backend:4000
+ENV INTERNAL_API_URL=http://backend:4000
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

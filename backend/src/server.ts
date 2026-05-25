@@ -1,5 +1,6 @@
 import "./lib/bigintPatch";
 import express, { Request, Response, NextFunction } from "express";
+import { Server } from "http";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
@@ -30,8 +31,13 @@ import { FileService } from "./services/fileService";
 import { wsServer } from "./websocket";
 import { mdnsService } from "./services/mdnsService";
 import networkRoutes from "./routes/networkRoutes";
+import { getCacheClient } from "./lib/redis";
 
 const app = express();
+
+if (config.trustProxy) {
+  app.set("trust proxy", config.trustProxy);
+}
 
 // Custom Express JSON replacer to serialize BigInts safely
 app.set("json replacer", (key: string, value: any) => {
@@ -59,6 +65,11 @@ const isAllowedOrigin = (origin: string | undefined): boolean => {
   try {
     const url = new URL(origin);
     const hostname = url.hostname;
+    const normalizedOrigin = url.origin.replace(/\/$/, "");
+
+    if (config.corsOrigins.includes(normalizedOrigin)) {
+      return true;
+    }
 
     if (
       hostname === "localhost" ||
@@ -91,7 +102,7 @@ const isAllowedOrigin = (origin: string | undefined): boolean => {
 
     if (config.frontendUrl) {
       const configuredUrl = new URL(config.frontendUrl);
-      if (hostname === configuredUrl.hostname) {
+      if (normalizedOrigin === configuredUrl.origin.replace(/\/$/, "")) {
         return true;
       }
     }
@@ -171,6 +182,22 @@ app.get("/api/health", (_req: Request, res: Response) => {
   });
 });
 
+app.get("/health/ready", asyncHandler(async (_req: Request, res: Response) => {
+  await prisma.$queryRaw`SELECT 1`;
+  await getCacheClient().ping();
+  const diskStats = await storageService.getDiskStats();
+
+  res.json({
+    status: "ready",
+    name: "NewCloud",
+    dependencies: {
+      database: "ok",
+      redis: "ok",
+      storage: diskStats.totalDisk > 0 ? "ok" : "unknown",
+    },
+  });
+}));
+
 // Bull Board - Queue monitoring dashboard
 const bullBoardAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -230,10 +257,13 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Initialize storage
-(async () => {
+let server: Server | null = null;
+
+async function initializeAndListen(): Promise<void> {
   try {
     await storageService.initialize();
+    await prisma.$queryRaw`SELECT 1`;
+    await getCacheClient().ping();
 
     try {
       await Promise.all([
@@ -250,20 +280,31 @@ app.use((_req: Request, res: Response) => {
     console.log(`Available space: ${(diskStats.freeDisk / 1024 / 1024 / 1024).toFixed(2)} GB`);
   } catch (error) {
     console.error("Storage initialization failed:", error);
+    throw error;
   }
-})();
 
-// Graceful shutdown
-const server = app.listen(config.port, "0.0.0.0", () => {
-  console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
-  wsServer.initialize(server);
-  mdnsService.start();
+  server = app.listen(config.port, "0.0.0.0", () => {
+    console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
+    wsServer.initialize(server!);
+    mdnsService.start();
+  });
+}
+
+void initializeAndListen().catch(async (error) => {
+  console.error("Startup failed. NewCloud will not accept traffic:", error);
+  await prisma.$disconnect().catch(() => {});
+  process.exit(1);
 });
 
 const gracefulShutdown = async (signal: string) => {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
   mdnsService.stop();
   wsServer.disconnect();
+  if (!server) {
+    await prisma.$disconnect();
+    process.exit(0);
+    return;
+  }
   server.close(async () => {
     await prisma.$disconnect();
     console.log("Server closed and database disconnected");

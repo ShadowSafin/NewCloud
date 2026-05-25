@@ -1,66 +1,75 @@
-# AGENTS.md - CloudStore Development Guide
+# AGENTS.md - NewCloud Development Guide
 
 ## Quick Start
 
 ```bash
-# Start full stack with Docker (includes DB migrations, Redis, worker)
-docker compose up -d
+# Deploy directly from GitHub on Linux/NAS/macOS.
+curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh | sh
 
-# Manual dev setup
-# Backend
-cd backend && npm install && npx prisma generate && npx prisma migrate dev && npm run dev
-# Frontend  
-cd frontend && npm install && echo "NEXT_PUBLIC_API_URL=http://localhost:4000" > .env.local && npm run dev
+# Secure first deployment from an existing checkout.
+bash setup.sh
+
+# Repeat Linux/NAS startup after configuration exists.
+sh start.sh
+
+# Windows equivalents.
+setup.bat
+start.bat
+```
+
+```powershell
+# Deploy directly from GitHub on Windows.
+irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | iex
 ```
 
 ## Commands
 
 | Component | Command | Description |
-|-----------|---------|-------------|
-| All | `docker compose up -d` | Start all services |
-| Backend | `npm run dev` | ts-node-dev with hot reload |
+| --------- | ------- | ----------- |
+| All | GitHub `install.sh` / `install.ps1` one-liner | Clone and secure first deployment |
+| All | `bash setup.sh` / `setup.bat` | Secure deployment from an existing checkout |
+| All | `sh start.sh` / `start.bat` | Validated repeat startup |
+| All | `sh update.sh` | PostgreSQL dump, Git fast-forward, migration-safe rebuild |
+| All | `docker compose logs -f backend worker` | Inspect runtime/worker logs |
+| Backend | `npm run dev` | `ts-node-dev` with hot reload |
 | Backend | `npm run build` | TypeScript compilation |
-| Backend | `npm run db:migrate` | Prisma migration |
+| Backend | `npm run db:migrate` | Prisma development migration |
 | Backend | `npm run db:generate` | Prisma client generation |
 | Backend | `npm run lint` | ESLint |
 | Backend | `npm run typecheck` | TypeScript check |
 | Worker | `npm run worker` | Background job processor |
-| Frontend | `npm run dev` | Next.js dev server (port 3000) |
+| Frontend | `npm run dev` | Next.js dev server on port `3000` |
 | Frontend | `npm run build` | Next.js production build |
 | Frontend | `npm run lint` | Next.js lint |
 | Frontend | `npm run typecheck` | TypeScript check |
 
 ## Architecture
 
-- **Monorepo**: `backend/` and `frontend/` directories
+- **Monorepo**: `backend/` and `frontend/`
 - **Backend entrypoint**: `backend/src/server.ts`
 - **Worker entrypoint**: `backend/src/worker.ts`
-- **Database**: Prisma ORM with PostgreSQL (schema: `backend/prisma/schema.prisma`)
-- **Cache**: Redis (container: `cloud-redis`, port 6379)
-- **Storage**: Local filesystem at `./data/storage/users/{user-id}/` (mounted to `/app/data`)
-- **Authentication**: JWT access tokens (15m) + refresh tokens (7d)
-- **File Types**: Universal file type detection with 15+ categories (images, video, code, etc.)
+- **Database**: Prisma ORM with PostgreSQL; schema in `backend/prisma/schema.prisma`
+- **Queues**: Redis and BullMQ on an internal Compose network
+- **Storage**: Content-addressed blobs and derived media under `./data/storage`, mounted to `/app/data`
+- **Authentication**: JWT access tokens plus rotating persisted refresh tokens
+- **Deployment**: Five Compose services with health checks and migration-driven backend startup
 
 ## Important Notes
 
-- Backend runs on port **4000** (not 3000 - that's frontend)
-- Docker compose auto-runs `npx prisma db push` on backend container start
-- File uploads max size: 1TB (configurable via `MAX_FILE_SIZE`)
-- Storage root: `/app/data/storage` (set via `STORAGE_ROOT` env)
-- Frontend requires `NEXT_PUBLIC_API_URL` in `.env.local` pointing to backend
-- Prisma studio: `npm run db:studio` from backend directory
-- **Worker container** processes thumbnails in background using Sharp
-- **Redis** is used for job queues and caching
+- Frontend is published on port `3000`; backend API is published on port `4000`.
+- Production startup uses `backend/scripts/deploy-migrations.sh`: normal Prisma migrations plus a guarded additive baseline for former schema-push installs. Never introduce destructive `db push` startup commands.
+- Setup generates strong `DB_PASSWORD`, JWT, media-signing, and Bull Board secrets; production rejects weak values.
+- File upload ceilings are configurable through `MAX_FILE_SIZE` and `MAX_UPLOAD_CHUNK_SIZE`.
+- Deployment defaults block dangerous uploads with `BLOCK_DANGEROUS_UPLOADS=true`.
+- PostgreSQL and Redis are not host-published in the production Compose stack.
+- The backend readiness probe is `/health/ready`; frontend health is `/health`.
 
 ## Docker Services
 
-Running containers:
-- `cloud-frontend` - Next.js 15 (port 3000)
-- `cloud-backend` - Express API (port 4000)
-- `cloud-postgres` - PostgreSQL (port 5433)
-- `cloud-redis` - Redis (port 6379)
-- `cloud-worker` - Background job processor
-
-Volumes:
-- `./data:/app/data` - User files and thumbnails (persistent)
-- `postgres_data` - Database files
+| Service | Role | Persistence |
+| ------- | ---- | ----------- |
+| `frontend` | Next.js interface and same-origin API proxy | None |
+| `backend` | Express API, signed media streaming, health, WebSocket endpoint | `${NEWCLOUD_DATA_DIR:-./data}:/app/data` |
+| `worker` | Background uploads, thumbnail, and integrity workers | `${NEWCLOUD_DATA_DIR:-./data}:/app/data` |
+| `postgres` | Transactional metadata | `newcloud_postgres_data` |
+| `redis` | Queues and event transport | `newcloud_redis_data` |

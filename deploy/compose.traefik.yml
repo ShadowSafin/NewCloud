@@ -1,0 +1,33 @@
+# Usage:
+#   docker network create proxy
+#   NEWCLOUD_DOMAIN=cloud.example.com docker compose -f docker-compose.yml \
+#     -f deploy/compose.traefik.yml up -d --build
+#
+# Traefik handles HTTPS and forwards normal traffic to the frontend. WebSocket upgrades
+# are routed directly to the API because the Next.js rewrite covers only /api routes.
+services:
+  frontend:
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.newcloud.rule=Host(`${NEWCLOUD_DOMAIN:?Set NEWCLOUD_DOMAIN}`)
+      - traefik.http.routers.newcloud.entrypoints=websecure
+      - traefik.http.routers.newcloud.tls=true
+      - traefik.http.services.newcloud.loadbalancer.server.port=3000
+
+  backend:
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.newcloud-ws.rule=Host(`${NEWCLOUD_DOMAIN:?Set NEWCLOUD_DOMAIN}`) && Path(`/ws`)
+      - traefik.http.routers.newcloud-ws.entrypoints=websecure
+      - traefik.http.routers.newcloud-ws.tls=true
+      - traefik.http.routers.newcloud-ws.priority=100
+      - traefik.http.services.newcloud-ws.loadbalancer.server.port=4000
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:-proxy}

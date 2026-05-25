@@ -1,0 +1,8 @@
+# Deployment scripts and container configuration must remain usable on Linux hosts.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+
+# Native Windows launchers stay comfortable to run from Command Prompt and PowerShell.
+*.bat text eol=crlf
+*.ps1 text eol=crlf

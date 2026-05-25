@@ -23,6 +23,9 @@ const databaseUrl = process.env.DATABASE_URL || "";
 if (isProduction && !databaseUrl) {
   throw new Error("DATABASE_URL is required in production");
 }
+if (isProduction) {
+  requireProductionSecret("DB_PASSWORD", process.env.DB_PASSWORD || "");
+}
 
 if (isProduction && !process.env.MEDIA_TOKEN_SECRET) {
   throw new Error("MEDIA_TOKEN_SECRET is required in production");
@@ -44,6 +47,11 @@ const maxUploadChunkSize = parsePositiveInteger(
   "268435456"
 );
 const blockDangerousUploads = process.env.BLOCK_DANGEROUS_UPLOADS === "true";
+const corsOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+const trustProxy = process.env.TRUST_PROXY?.trim() || "";
 
 if (maxUploadChunkSize < uploadChunkSize) {
   throw new Error("MAX_UPLOAD_CHUNK_SIZE must be greater than or equal to UPLOAD_CHUNK_SIZE");
@@ -68,6 +76,8 @@ export const config = {
   maxUploadChunkSize,
   blockDangerousUploads,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+  corsOrigins,
+  trustProxy,
 
   // Phase 3: Production config
   trashRetentionDays: parseInt(process.env.TRASH_RETENTION_DAYS || "30", 10),

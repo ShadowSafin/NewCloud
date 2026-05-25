@@ -1,59 +1,64 @@
+name: newcloud
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: cloud-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-clouduser}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-cloudpass}
-      POSTGRES_DB: ${DB_NAME:-cloudstorage}
+      POSTGRES_USER: ${DB_USER:-newcloud}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-newcloud}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
+    networks:
+      - data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-clouduser} -d ${DB_NAME:-cloudstorage}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-newcloud} -d ${DB_NAME:-newcloud}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
-    container_name: cloud-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
-    ports:
-      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    volumes:
-      - redis_data:/data
+      retries: 12
+      start_period: 5s
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cloud-backend
     restart: unless-stopped
+    init: true
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      PORT: ${BACKEND_PORT:-4000}
-      DATABASE_URL: postgresql://${DB_USER:-clouduser}:${DB_PASSWORD:-cloudpass}@postgres:5432/${DB_NAME:-cloudstorage}?schema=public
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 4000
+      DB_PASSWORD: ${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}
+      DATABASE_URL: postgresql://${DB_USER:-newcloud}:${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}@postgres:5432/${DB_NAME:-newcloud}?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
-      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?MEDIA_TOKEN_SECRET is required}
+      JWT_SECRET: ${JWT_SECRET:?Run setup.sh/setup.bat first or set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Run setup.sh/setup.bat first or set JWT_REFRESH_SECRET}
+      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?Run setup.sh/setup.bat first or set MEDIA_TOKEN_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
       STORAGE_ROOT: /app/data/storage
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-1099511627776}
       UPLOAD_CHUNK_SIZE: ${UPLOAD_CHUNK_SIZE:-16777216}
       MAX_UPLOAD_CHUNK_SIZE: ${MAX_UPLOAD_CHUNK_SIZE:-268435456}
-      BLOCK_DANGEROUS_UPLOADS: ${BLOCK_DANGEROUS_UPLOADS:-false}
+      BLOCK_DANGEROUS_UPLOADS: ${BLOCK_DANGEROUS_UPLOADS:-true}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
       MAX_VERSIONS_PER_FILE: ${MAX_VERSIONS_PER_FILE:-10}
       DEFAULT_STORAGE_QUOTA: ${DEFAULT_STORAGE_QUOTA:-10737418240}
@@ -61,24 +66,31 @@ services:
       MAX_FILES_PER_USER: ${MAX_FILES_PER_USER:-100000}
       MAX_UPLOADS_PER_MINUTE: ${MAX_UPLOADS_PER_MINUTE:-30}
       BULL_BOARD_USERNAME: ${BULL_BOARD_USERNAME:-admin}
-      BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:?BULL_BOARD_PASSWORD is required}
-      HOST_LAN_IP: ${HOST_LAN_IP}
-      HOST_HOSTNAME: ${HOST_HOSTNAME}
+      BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:?Run setup.sh/setup.bat first or set BULL_BOARD_PASSWORD}
+      HOST_LAN_IP: ${HOST_LAN_IP:-}
+      HOST_HOSTNAME: ${HOST_HOSTNAME:-}
     volumes:
-      - ./data:/app/data
+      - ${NEWCLOUD_DATA_DIR:-./data}:/app/data
     ports:
-      - "${BACKEND_PORT:-4000}:4000"
+      - "${BACKEND_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT:-4000}:4000"
+    networks:
+      - web
+      - data
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-    command: sh -c "npx prisma migrate deploy && npm start"
+      retries: 12
+      start_period: 30s
+    command: sh -c "sh ./scripts/deploy-migrations.sh && npm start"
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
 
   frontend:
     build:
@@ -86,52 +98,78 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ""
-        INTERNAL_API_URL: http://cloud-backend:4000
-    container_name: cloud-frontend
+        INTERNAL_API_URL: http://backend:4000
     restart: unless-stopped
+    init: true
     environment:
       NEXT_PUBLIC_API_URL: ""
-      INTERNAL_API_URL: http://cloud-backend:4000
+      INTERNAL_API_URL: http://backend:4000
     ports:
-      - "3000:3000"
+      - "${FRONTEND_BIND_ADDRESS:-0.0.0.0}:${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - web
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
 
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cloud-worker
     restart: unless-stopped
+    init: true
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: postgresql://${DB_USER:-clouduser}:${DB_PASSWORD:-cloudpass}@postgres:5432/${DB_NAME:-cloudstorage}?schema=public
+      NODE_ENV: ${NODE_ENV:-production}
+      DB_PASSWORD: ${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}
+      DATABASE_URL: postgresql://${DB_USER:-newcloud}:${DB_PASSWORD:?Run setup.sh/setup.bat first or set DB_PASSWORD}@postgres:5432/${DB_NAME:-newcloud}?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
-      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?MEDIA_TOKEN_SECRET is required}
+      JWT_SECRET: ${JWT_SECRET:?Run setup.sh/setup.bat first or set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Run setup.sh/setup.bat first or set JWT_REFRESH_SECRET}
+      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?Run setup.sh/setup.bat first or set MEDIA_TOKEN_SECRET}
       STORAGE_ROOT: /app/data/storage
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-1099511627776}
       UPLOAD_CHUNK_SIZE: ${UPLOAD_CHUNK_SIZE:-16777216}
       MAX_UPLOAD_CHUNK_SIZE: ${MAX_UPLOAD_CHUNK_SIZE:-268435456}
-      BLOCK_DANGEROUS_UPLOADS: ${BLOCK_DANGEROUS_UPLOADS:-false}
+      BLOCK_DANGEROUS_UPLOADS: ${BLOCK_DANGEROUS_UPLOADS:-true}
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
       MAX_VERSIONS_PER_FILE: ${MAX_VERSIONS_PER_FILE:-10}
+      TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
     volumes:
-      - ./data:/app/data
+      - ${NEWCLOUD_DATA_DIR:-./data}:/app/data
+    networks:
+      - data
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'node.*worker' || exit 1"]
+      test: ["CMD-SHELL", "pgrep -f 'node dist/worker.js' >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 20s
     command: node dist/worker.js
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
 
 volumes:
   postgres_data:
+    name: newcloud_postgres_data
   redis_data:
+    name: newcloud_redis_data
+
+networks:
+  web:
+    name: newcloud_web
+  data:
+    name: newcloud_data
+    internal: true

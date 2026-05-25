@@ -85,8 +85,11 @@ NewCloud/
 |       |-- lib/
 |       `-- store/
 |-- data/                       # bind-mounted application data
+|-- deploy/                     # HTTPS/proxy deployment examples
 |-- docker-compose.yml
-|-- start.ps1
+|-- setup.sh / setup.ps1        # secure first-install launchers
+|-- start.sh / start.ps1        # validated repeat launchers
+|-- update.sh                   # backup-first Linux update launcher
 `-- .env.example
 ```
 
@@ -94,22 +97,27 @@ NewCloud/
 
 Docker Compose provisions five runtime services:
 
-| Service          | Image/runtime            | Port        | Durable resources  | Role                                                                               |
-| ---------------- | ------------------------ | ----------- | ------------------ | ---------------------------------------------------------------------------------- |
-| `cloud-frontend` | Node 20, Next standalone | `3000`      | None               | Web application and `/api` reverse proxy.                                          |
-| `cloud-backend`  | Node 20, Express         | `4000`      | `./data:/app/data` | REST API, media streaming, health checks, queue dashboard, mDNS, WebSocket server. |
-| `cloud-worker`   | Same backend image       | None        | `./data:/app/data` | BullMQ consumers and scheduled integrity jobs.                                     |
-| `cloud-postgres` | PostgreSQL 16 Alpine     | host `5433` | `postgres_data`    | Transactional metadata.                                                            |
-| `cloud-redis`    | Redis 7 Alpine           | `6379`      | `redis_data`       | Queues, caching support, and event transport.                                      |
+| Service    | Image/runtime            | Published port        | Durable resources        | Role                                                                               |
+| ---------- | ------------------------ | --------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| `frontend` | Node 22, Next standalone | `${FRONTEND_PORT}:3000` | None                     | Web application, frontend health endpoint, and `/api` reverse proxy.               |
+| `backend`  | Node 20, Express         | `${BACKEND_PORT}:4000`  | `${NEWCLOUD_DATA_DIR}`   | REST API, secure streaming, readiness checks, queue dashboard, mDNS, WebSockets.   |
+| `worker`   | Same backend image       | None                  | `${NEWCLOUD_DATA_DIR}`   | BullMQ consumers and scheduled integrity jobs; waits for healthy backend startup.  |
+| `postgres` | PostgreSQL 16 Alpine     | Not host-published    | `newcloud_postgres_data` | Transactional metadata; internal data network only.                                |
+| `redis`    | Redis 7 Alpine           | Not host-published    | `newcloud_redis_data`    | Queues and event transport; internal data network only.                            |
 
 On backend container startup, Compose executes:
 
 ```bash
-npx prisma migrate deploy && npm start
+sh ./scripts/deploy-migrations.sh && npm start
 ```
 
-This is a migration-driven startup path and is suitable for persistent databases when
-migrations are reviewed before deployment.
+Fresh databases use standard Prisma migration deployment. If Prisma reports `P3005`
+for an installation created by the earlier schema-push startup, the launcher applies
+and records the committed additive baseline and blob migration only after recognizing
+legacy NewCloud core tables, then resumes normal
+`prisma migrate deploy` processing. Startup refuses weak production secrets, waits on
+PostgreSQL and Redis health, verifies writable storage, and exposes readiness at
+`/health/ready` only after dependencies respond.
 
 ## Backend Modules
 
@@ -179,7 +187,7 @@ flowchart LR
 
 The Compose frontend intentionally exposes an empty `NEXT_PUBLIC_API_URL`, causing browser
 requests to stay same-origin at `/api`; the Next.js server forwards those calls to
-`http://cloud-backend:4000`. Manual development sets a visible API origin.
+`http://backend:4000`. Manual development sets a visible API origin.
 
 ## Data Model
 
@@ -494,10 +502,15 @@ Browser -> https://cloud.example.test/api/* -> Next.js rewrite -> Express API
 When deploying behind a reverse proxy:
 
 - terminate TLS at the proxy,
-- forward both UI and `/api` consistently,
-- configure allowed frontend origin values,
+- forward UI and `/api` to the frontend same-origin path,
+- route `/ws` upgrades to backend port `4000` when that transport is enabled,
+- set `FRONTEND_URL`, `CORS_ORIGINS`, and trusted-proxy configuration,
 - preserve byte range requests for media streams,
 - consider restricting the queue dashboard separately.
+
+The root deployment includes `deploy/Caddyfile.example` and
+`deploy/compose.traefik.yml`; production proxy hosts can bind published ports to
+`127.0.0.1` rather than exposing them directly.
 
 ## Operational Invariants
 
@@ -520,7 +533,7 @@ These observations are important when planning production work:
 | Area                             | Current state                                                                                                   |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | WebSocket updates                | Infrastructure is implemented; service mutation event emission is not yet wired.                                |
-| Dangerous uploads                | Validation support exists, but rejection is opt-in with `BLOCK_DANGEROUS_UPLOADS=true`.                         |
+| Dangerous uploads                | Deployment configuration rejects known dangerous uploads by default; administrators can explicitly change it.    |
 | Quotas                           | `storageQuota` is modeled and shown, while request quota middleware currently permits unlimited use.            |
 | Public share passwords           | Password-protected public requests pass the password as a query parameter in the current frontend/API contract. |
 | WebSocket auth                   | A JWT query-token compatibility path remains and should be replaced before untrusted exposure.                  |

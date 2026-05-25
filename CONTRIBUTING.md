@@ -21,14 +21,15 @@ Read these documents before changing core behavior:
 ```bash
 git clone https://github.com/ShadowSafin/NewCloud.git
 cd NewCloud
-cp .env.example .env
+bash setup.sh
 ```
 
-Replace the required signing and administration secrets in `.env` with independent strong
-values, then run:
+On Windows use `setup.bat`. Both first-install launchers create a production `.env` with
+independent cryptographic secrets, prepare storage, run Compose, and wait for readiness.
+After first boot, use:
 
 ```bash
-docker compose up -d --build
+sh start.sh
 docker compose ps
 docker compose logs -f backend worker
 ```

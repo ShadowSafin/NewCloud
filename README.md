@@ -7,7 +7,7 @@
     resumable uploads, signed media delivery, and integrity-first background maintenance.
   </p>
   <p>
-    <a href="#quick-start"><strong>Get Started</strong></a> |
+    <a href="#one-command-deployment"><strong>Deploy NewCloud</strong></a> |
     <a href="./ARCHITECTURE.md">Architecture</a> |
     <a href="./API.md">API Reference</a> |
     <a href="./CONTRIBUTING.md">Contributing</a>
@@ -19,6 +19,7 @@
     <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white">
     <img alt="Redis" src="https://img.shields.io/badge/Redis-BullMQ-DC382D?style=flat-square&logo=redis&logoColor=white">
     <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white">
+    <img alt="One Command Deploy" src="https://img.shields.io/badge/Deploy-one_command-15B8A6?style=flat-square">
   </p>
 </div>
 
@@ -131,83 +132,160 @@ For internals, invariants, and data flows, see [ARCHITECTURE.md](./ARCHITECTURE.
 | Media processing          | Sharp, FFmpeg, Poppler                                      |
 | Network discovery         | `bonjour-service` mDNS publication                          |
 | Testing and quality       | Vitest, ESLint, Prettier, strict TypeScript                 |
-| Containers                | Docker Compose, Node.js 20 Alpine images                    |
+| Containers                | Docker Compose, Node.js Alpine runtime images               |
 
-## Quick Start
+## One-Command Deployment
 
 ### Prerequisites
 
-- Docker Desktop with Compose support
+- Docker Engine or Docker Desktop with Docker Compose v2
 - Git
-- Optional for manual development: Node.js 20+ and a local PostgreSQL/Redis pair
+- Optional for manual development: Node.js 22+ and a local PostgreSQL/Redis pair
 
-### Docker Compose
+### Deploy Directly from GitHub
 
-1. Clone and enter the repository.
+Linux, macOS, or a NAS shell:
 
-   ```bash
-   git clone https://github.com/ShadowSafin/NewCloud.git
-   cd NewCloud
-   ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh | sh
+```
 
-2. Create configuration from the template.
+Windows PowerShell:
 
-   ```bash
-   cp .env.example .env
-   ```
+```powershell
+irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | iex
+```
 
-   On PowerShell:
+That one command clones this repository into `NewCloud`, generates independent
+cryptographic secrets, prepares persistent storage, builds the five Docker services,
+applies committed Prisma migrations, and waits until the frontend and backend are
+healthy. Running it again launches the existing checkout without silently pulling source
+updates.
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
+To deploy a selected branch or destination directory from the GitHub bootstrap:
 
-3. Replace every secret placeholder in `.env` with independent random values of at
-   least 32 characters. Production startup rejects weak values.
+```bash
+curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh |
+  NEWCLOUD_REPOSITORY_REF=my-branch NEWCLOUD_INSTALL_DIR=/srv/newcloud sh
+```
 
-   ```powershell
-   $bytes = New-Object byte[] 32
-   [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-   [Convert]::ToHexString($bytes)
-   ```
+If the repository is already cloned, start it locally with `bash setup.sh` on Unix
+systems or `setup.bat` on Windows.
 
-   Required secrets:
+| Service         | URL                                                                      |
+| --------------- | ------------------------------------------------------------------------ |
+| Web application | [http://localhost:3000](http://localhost:3000)                           |
+| API readiness   | [http://localhost:4000/health/ready](http://localhost:4000/health/ready) |
+| Queue dashboard | [http://localhost:4000/admin/queues](http://localhost:4000/admin/queues) |
 
-   ```dotenv
-   JWT_SECRET=<strong-random-secret>
-   JWT_REFRESH_SECRET=<different-strong-random-secret>
-   MEDIA_TOKEN_SECRET=<different-strong-random-secret>
-   BULL_BOARD_PASSWORD=<different-strong-random-password>
-   ```
+Review scripts before piping remote code on sensitive servers. The standard deployment
+path never uses destructive schema synchronization. Fresh databases run
+`prisma migrate deploy`; databases created by the earlier schema-push startup are
+detected on Prisma `P3005`, upgraded with committed additive baseline SQL, recorded in
+migration history, and returned to normal migration deployment only after identifying
+the expected legacy NewCloud tables. The API becomes healthy
+only after PostgreSQL, Redis, and writable storage pass readiness checks.
 
-4. Start the stack.
+### Deployment Scripts
 
-   ```bash
-   docker compose up -d --build
-   ```
+| Script        | Platform       | Purpose                                                                 |
+| ------------- | -------------- | ----------------------------------------------------------------------- |
+| `install.sh`  | Linux/NAS/macOS | Remote GitHub bootstrap: clone or launch, then run secure setup.        |
+| `install.ps1` | Windows        | Remote GitHub bootstrap from PowerShell.                               |
+| `setup.sh`    | Linux/NAS/macOS | First boot: secure `.env`, storage directory, port check, build/start.  |
+| `setup.bat`   | Windows        | First boot through PowerShell with cryptographic secret generation.     |
+| `start.sh`    | Linux/NAS/macOS | Validate existing configuration and start/rebuild healthy services.     |
+| `start.bat`   | Windows        | Validate and launch an existing Windows installation.                   |
+| `update.sh`   | Linux/NAS/macOS | Dump PostgreSQL, fast-forward source, migrate safely, restart services. |
 
-5. Open the interface and health endpoint.
-
-   | Service         | URL                                                                      |
-   | --------------- | ------------------------------------------------------------------------ |
-   | Web application | [http://localhost:3000](http://localhost:3000)                           |
-   | API health      | [http://localhost:4000/health](http://localhost:4000/health)             |
-   | Queue dashboard | [http://localhost:4000/admin/queues](http://localhost:4000/admin/queues) |
-
-The backend container executes `prisma migrate deploy` before starting. It does not use
-destructive schema synchronization.
-
-### Useful Compose Commands
+### Useful Commands
 
 ```bash
 docker compose ps
 docker compose logs -f backend worker
-docker compose restart backend worker
+sh start.sh
+sh update.sh
 docker compose down
 ```
 
 Persistent data remains in the PostgreSQL and Redis named volumes and in the bind-mounted
 `./data` directory unless explicitly removed.
+
+When upgrading an existing development installation, `setup.sh` and `setup.bat` preserve
+explicit values already present in `.env`. Before exposing that installation outside a
+trusted LAN, set `NODE_ENV=production`, replace any weak secrets, enable
+`BLOCK_DANGEROUS_UPLOADS=true`, and configure HTTPS proxy origins.
+
+## Deployment Targets
+
+The root [`docker-compose.yml`](./docker-compose.yml) is the deployment contract. It
+builds `frontend`, `backend`, and `worker` from the repository and provisions internal
+PostgreSQL and Redis services with health checks and persistent storage.
+
+| Target                 | Deployment route                                                                                                               | Status                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| Docker Compose         | Run the GitHub one-liner above, or run `bash setup.sh` / `setup.bat` from an existing checkout.                                | First-class                    |
+| Portainer              | Create a Git Repository stack targeting `docker-compose.yml`; paste production variables generated from `.env.example`.       | Compose-compatible             |
+| Coolify                | Add a Docker Compose resource from GitHub, set required variables, and publish only the `frontend` service on port `3000`.     | Compose-compatible             |
+| Dockge                 | Clone locally, run setup once for `.env`, then manage the root Compose stack in Dockge.                                        | Compose-compatible             |
+| Cosmos Cloud           | Run NewCloud with Docker Compose on the managed host; a native Cosmos-Compose marketplace descriptor is not yet distributed.  | Host Compose path              |
+| CasaOS / Umbrel        | Use the host terminal deployment command; branded marketplace packaging is intentionally separate from the production stack. | Host Compose path              |
+| Railway / Render       | Service-by-service Docker deployment can be prepared from these Dockerfiles; persistent volume and managed DB wiring needed.  | Future hosted-platform target  |
+
+For panel deployments, do not commit `.env`. Generate five distinct 64-character hex
+secrets locally and enter them as stack environment variables:
+
+```bash
+openssl rand -hex 32
+```
+
+Required variables are `DB_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET`,
+`MEDIA_TOKEN_SECRET`, and `BULL_BOARD_PASSWORD`. Keep `NODE_ENV=production` and
+`BLOCK_DANGEROUS_UPLOADS=true`. Missing or weak values cause application startup to fail.
+
+<details>
+<summary><strong>Portainer Git stack</strong></summary>
+
+1. In **Stacks**, choose **Add stack** and the Git repository option.
+2. Enter this repository URL and `docker-compose.yml` as the Compose path.
+3. Define the five required secrets above plus `FRONTEND_URL` for the address users open.
+4. For durable file bytes across Git redeployments, set `NEWCLOUD_DATA_DIR` to an
+   absolute persistent host path, such as `/srv/newcloud/data`.
+5. Deploy the stack and wait for `frontend` and `backend` health checks to become healthy.
+
+Reference: [Portainer - add a stack from Git](https://docs.portainer.io/2.33-lts/user/docker/stacks/add)
+
+</details>
+
+<details>
+<summary><strong>Coolify Compose resource</strong></summary>
+
+1. Create a new resource from the public Git repository using the Docker Compose build pack.
+2. Supply the required production variables before the initial deployment.
+3. Map a domain to the `frontend` service on container port `3000`.
+4. Keep `postgres` and `redis` private; do not publish them as domains or host ports.
+5. Persist `/app/data` for `backend` and `worker` through the same host-backed path.
+
+Reference: [Coolify - Docker Compose deployments](https://coolify.io/docs/knowledge-base/docker/compose)
+
+</details>
+
+<details>
+<summary><strong>Control panels and future hosted platforms</strong></summary>
+
+Dockge can operate the standard Compose project after `setup.sh` has securely created its
+configuration. Cosmos Cloud uses a related Cosmos-Compose format with proxy-specific
+extensions, so the standard host Compose path is supported while a marketplace manifest
+is prepared separately. Railway does not execute `docker-compose.yml` directly; its
+deployment path maps each Dockerfile/database/volume to separate services. Render similarly
+uses individual Docker services rather than this five-service Compose stack.
+
+References:
+[Cosmos-Compose](https://docs.cosmos-cloud.io/guides/cosmos-compose/),
+[Railway Compose translation](https://docs.railway.com/guides/docker-compose),
+[Render Docker services](https://render.com/docs/docker)
+
+</details>
 
 ### Manual Development
 
@@ -248,17 +326,19 @@ Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 
 | Variable                        | Purpose                                                              | Default or example                       |
 | ------------------------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| `NODE_ENV`                      | Enables production secret and startup safety checks                  | `production` in deployments              |
+| `DB_PASSWORD`                   | PostgreSQL password; also validated before production API startup    | Generated by setup                       |
 | `DATABASE_URL`                  | PostgreSQL connection for the API and worker                         | Required in production                   |
 | `REDIS_URL`                     | BullMQ and Redis connection                                          | `redis://localhost:6379` in local config |
 | `BACKEND_PORT` / `PORT`         | Published API port / process port                                    | `4000`                                   |
 | `NEXT_PUBLIC_API_URL`           | Browser-visible API origin; blank in Compose to use Next.js rewrites | `http://localhost:4000` for manual dev   |
-| `INTERNAL_API_URL`              | Next.js rewrite destination inside Compose                           | `http://cloud-backend:4000`              |
+| `INTERNAL_API_URL`              | Next.js rewrite destination inside Compose                           | `http://backend:4000`                    |
 | `FRONTEND_URL`                  | Allowed frontend origin seed for CORS                                | `http://localhost:3000`                  |
 | `STORAGE_ROOT`                  | Root for blobs, uploads, and thumbnails                              | `/app/data/storage`                      |
 | `MAX_FILE_SIZE`                 | Maximum accepted whole upload in bytes                               | `1099511627776` (1 TiB)                  |
 | `UPLOAD_CHUNK_SIZE`             | Chunk size returned when a session is initiated                      | `16777216` (16 MiB)                      |
 | `MAX_UPLOAD_CHUNK_SIZE`         | Multer ceiling for an individual chunk                               | `268435456` (256 MiB)                    |
-| `BLOCK_DANGEROUS_UPLOADS`       | Reject executable/dangerous extensions and MIME types                | `false`                                  |
+| `BLOCK_DANGEROUS_UPLOADS`       | Reject executable/dangerous extensions and MIME types                | `true` in deployments                    |
 | `TRASH_RETENTION_DAYS`          | Scheduled trash removal age                                          | `30`                                     |
 | `MAX_VERSIONS_PER_FILE`         | Version retention target per file                                    | `10`                                     |
 | `JWT_SECRET`                    | Access-token signing secret                                          | Required; strong in production           |
@@ -266,19 +346,15 @@ Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 | `MEDIA_TOKEN_SECRET`            | Short-lived media URL signing secret                                 | Required; strong in production           |
 | `BULL_BOARD_USERNAME`           | Queue dashboard username                                             | `admin`                                  |
 | `BULL_BOARD_PASSWORD`           | Queue dashboard password                                             | Required; strong in production           |
-| `HOST_LAN_IP` / `HOST_HOSTNAME` | Values reported by LAN status discovery                              | Set by `start.ps1` or manually           |
+| `TRUST_PROXY`                   | Trusted proxy hops for secure forwarding behavior                    | Private/local proxy ranges               |
+| `CORS_ORIGINS`                  | Comma-separated additional HTTPS frontend origins                    | Blank                                    |
+| `HOST_LAN_IP` / `HOST_HOSTNAME` | Values reported by LAN status discovery                              | Set by launch scripts or manually        |
 
 ## Local Network Access
 
-NewCloud listens on all interfaces in the backend container and the settings screen exposes
-available LAN URLs. The PowerShell helper detects a local address and hostname, writes
-`HOST_LAN_IP` and `HOST_HOSTNAME` into `.env`, then builds and starts Compose:
-
-```powershell
-.\start.ps1
-```
-
-After startup, browser clients on the same local network can normally use:
+NewCloud binds the UI and API to all host interfaces by default for trusted home-network
+installations. The launchers write detected network information into `.env`; LAN-connected
+browser clients can then open the same interface:
 
 ```text
 http://<host-lan-ip>:3000
@@ -288,6 +364,55 @@ http://<hostname>.local:3000
 The API publishes both the web service and API service over mDNS. Private IPv4 origins and
 local hostnames are accepted by the API CORS policy. For any network beyond a trusted LAN,
 place NewCloud behind HTTPS and a reverse proxy.
+
+## Reverse Proxy and HTTPS
+
+The recommended public shape publishes the frontend and keeps browser API requests
+same-origin through the Next.js `/api` rewrite. Route `/ws` directly to backend port
+`4000` when enabling WebSocket clients.
+
+| Proxy                        | Setup                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| Caddy                        | Copy [`deploy/Caddyfile.example`](./deploy/Caddyfile.example) and set your hostname. |
+| Traefik / Coolify            | Apply [`deploy/compose.traefik.yml`](./deploy/compose.traefik.yml) as an overlay.    |
+| Nginx Proxy Manager          | Proxy the hostname to `frontend:3000`; add a `/ws` advanced location to `backend:4000` with WebSocket upgrade headers. |
+| Cloudflare Tunnel            | Tunnel the HTTPS hostname to the frontend; separately preserve `/ws` upgrades if realtime transport is enabled. |
+
+For a public proxy host, restrict direct host exposure:
+
+```dotenv
+FRONTEND_BIND_ADDRESS=127.0.0.1
+BACKEND_BIND_ADDRESS=127.0.0.1
+FRONTEND_URL=https://cloud.example.com
+CORS_ORIGINS=https://cloud.example.com
+```
+
+The PostgreSQL and Redis services are never bound to host ports in the production Compose
+file; they remain on an internal data network.
+
+## Persistence, Backups, and Updates
+
+| Data                       | Location                                                | Backup rule                                     |
+| -------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+| File blobs and thumbnails  | `${NEWCLOUD_DATA_DIR:-./data}/storage` on the host      | Back up together with database metadata.        |
+| PostgreSQL metadata        | Docker volume `newcloud_postgres_data`                  | Use `pg_dump` before updates and on a schedule. |
+| Redis queue persistence    | Docker volume `newcloud_redis_data`                     | Useful for queued work; not file metadata.      |
+| Temporary upload material  | Within the storage bind mount                           | May be cleaned after interrupted uploads.       |
+
+On Linux-based hosts, `sh update.sh` creates a timestamped PostgreSQL dump under the
+ignored `backups/` directory, pulls a fast-forward Git update, rebuilds, and allows only
+committed migrations or the committed additive legacy baseline to run. The first upgrade
+from an older schema-push installation is baselined automatically after that database
+dump. Back up the storage tree separately before upgrades that affect binary handling.
+
+To diagnose startup:
+
+```bash
+docker compose ps
+docker compose logs --tail=150 backend worker frontend
+curl -fsS http://localhost:4000/health/ready
+curl -fsS http://localhost:3000/health
+```
 
 ## Storage Engine
 
@@ -354,15 +479,15 @@ The browser sends files larger than 10 MiB through the chunk pipeline:
 | Media access         | Preview and download elements use expiring signed media URLs issued by authenticated API requests.                        |
 | Upload memory safety | Direct and chunk uploads are staged to disk by Multer with configurable size ceilings.                                    |
 | Signature validation | Common media/document container signatures are checked against uploaded bytes.                                            |
-| Dangerous content    | Executable and risky extensions/MIME types can be blocked with `BLOCK_DANGEROUS_UPLOADS=true`; it is disabled by default. |
+| Dangerous content    | Executable and risky extensions/MIME types are blocked by default in the deployment configuration.                          |
 | Filesystem safety    | Blob and user storage paths are resolved beneath the configured storage root before destructive work.                     |
 | Deployment secrets   | Production startup rejects missing, weak, or placeholder signing and queue-dashboard secrets.                             |
-| Database rollout     | Compose uses Prisma migrations with `prisma migrate deploy`.                                                              |
+| Database rollout     | Compose uses Prisma migrations; pre-migration installs receive a guarded additive baseline on Prisma `P3005`.           |
 
 Important deployment guidance:
 
-- Set `BLOCK_DANGEROUS_UPLOADS=true` on installations intended to accept content from
-  untrusted users.
+- Keep `BLOCK_DANGEROUS_UPLOADS=true` unless an administrator deliberately accepts the
+  risk of storing executable content.
 - Terminate HTTPS before exposing NewCloud beyond a trusted local network.
 - Protect `/admin/queues` with a strong unique password and restrict it at the proxy when possible.
 - Back up PostgreSQL metadata and the entire `data/storage` tree together.
