@@ -1,13 +1,14 @@
-# NewCloud
-
 <div align="center">
+  <img src="./.github/assets/newcloud-readme-hero.svg" alt="NewCloud - Your private cloud, running like an OS." width="100%">
+  <br>
+  <h1>NewCloud</h1>
   <h3>Your private cloud, running like an OS.</h3>
   <p>
     A self-hosted file platform with cinematic UX, content-addressed storage,
     resumable uploads, signed media delivery, and integrity-first background maintenance.
   </p>
   <p>
-    <a href="#one-command-deployment"><strong>Deploy NewCloud</strong></a> |
+    <a href="#deploy-newcloud-in-one-command"><strong>Deploy NewCloud</strong></a> |
     <a href="./ARCHITECTURE.md">Architecture</a> |
     <a href="./API.md">API Reference</a> |
     <a href="./CONTRIBUTING.md">Contributing</a>
@@ -25,18 +26,51 @@
 
 ---
 
+## Deploy NewCloud in One Command
+
+> Requires Docker Engine or Docker Desktop with Docker Compose v2, plus Git.
+
+| Linux / macOS / NAS / VPS | Windows PowerShell |
+| ------------------------- | ------------------ |
+| `curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh \| sh` | `irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 \| iex` |
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh | sh
+```
+
+```powershell
+irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | iex
+```
+
+<div align="center">
+
+`Clone repository` &nbsp; -> &nbsp; `Generate secure secrets` &nbsp; -> &nbsp; `Build 5 services` &nbsp; -> &nbsp; `Run safe migrations` &nbsp; -> &nbsp; `Ready on :3000`
+
+</div>
+
+| Open after deployment | Address |
+| --------------------- | ------- |
+| NewCloud              | [http://localhost:3000](http://localhost:3000) |
+| API readiness         | [http://localhost:4000/health/ready](http://localhost:4000/health/ready) |
+| Queue operations      | [http://localhost:4000/admin/queues](http://localhost:4000/admin/queues) |
+
+The installer creates production secrets, persistent data paths, health-checked
+containers, and committed migration state. It never runs destructive schema synchronization.
+
+---
+
+## Overview
+
 NewCloud is a LAN-friendly, self-hosted cloud storage application designed for people who
 want the convenience of a polished cloud drive while keeping the binary data on hardware
 they control. A Next.js interface speaks to an Express API; PostgreSQL owns metadata,
 Redis and BullMQ operate asynchronous maintenance, and the filesystem stores immutable
 SHA-256 addressed blobs.
 
-The current platform is built around one principle: file operations must preserve storage
+The platform is built around one principle: file operations must preserve storage
 integrity. Uploads become reference-counted blobs, trash and restore operations recalculate
 accounting transactionally, media is delivered through short-lived signed URLs, and
 scheduled workers reconcile drift and clean stale state.
-
-## Overview
 
 NewCloud sits between a personal NAS and a modern hosted drive:
 
@@ -134,33 +168,9 @@ For internals, invariants, and data flows, see [ARCHITECTURE.md](./ARCHITECTURE.
 | Testing and quality       | Vitest, ESLint, Prettier, strict TypeScript                 |
 | Containers                | Docker Compose, Node.js Alpine runtime images               |
 
-## One-Command Deployment
+## Deployment Reference
 
-### Prerequisites
-
-- Docker Engine or Docker Desktop with Docker Compose v2
-- Git
-- Optional for manual development: Node.js 22+ and a local PostgreSQL/Redis pair
-
-### Deploy Directly from GitHub
-
-Linux, macOS, or a NAS shell:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.sh | sh
-```
-
-Windows PowerShell:
-
-```powershell
-irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | iex
-```
-
-That one command clones this repository into `NewCloud`, generates independent
-cryptographic secrets, prepares persistent storage, builds the five Docker services,
-applies committed Prisma migrations, and waits until the frontend and backend are
-healthy. Running it again launches the existing checkout without silently pulling source
-updates.
+### Customized Bootstrap
 
 To deploy a selected branch or destination directory from the GitHub bootstrap:
 
@@ -172,11 +182,7 @@ curl -fsSL https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.s
 If the repository is already cloned, start it locally with `bash setup.sh` on Unix
 systems or `setup.bat` on Windows.
 
-| Service         | URL                                                                      |
-| --------------- | ------------------------------------------------------------------------ |
-| Web application | [http://localhost:3000](http://localhost:3000)                           |
-| API readiness   | [http://localhost:4000/health/ready](http://localhost:4000/health/ready) |
-| Queue dashboard | [http://localhost:4000/admin/queues](http://localhost:4000/admin/queues) |
+### Startup Guarantees
 
 Review scripts before piping remote code on sensitive servers. The standard deployment
 path never uses destructive schema synchronization. Fresh databases run

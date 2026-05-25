@@ -1,0 +1,146 @@
+<svg width="1200" height="430" viewBox="0 0 1200 430" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">NewCloud - Your private cloud, running like an OS</title>
+  <desc id="desc">A cinematic animated NewCloud banner with a glass dashboard, deployment status, and moving data paths.</desc>
+  <defs>
+    <linearGradient id="bg" x1="40" y1="0" x2="1160" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#04070F"/>
+      <stop offset="0.48" stop-color="#07111B"/>
+      <stop offset="1" stop-color="#03050C"/>
+    </linearGradient>
+    <linearGradient id="surface" x1="130" y1="38" x2="1062" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#142B39" stop-opacity="0.7"/>
+      <stop offset="0.45" stop-color="#09121D" stop-opacity="0.94"/>
+      <stop offset="1" stop-color="#171226" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="cyanPurple" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#16D9F4"/>
+      <stop offset="0.46" stop-color="#35CBE8"/>
+      <stop offset="1" stop-color="#9E72FF"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1BD9F5" stop-opacity="0"/>
+      <stop offset="0.48" stop-color="#1BD9F5" stop-opacity="0.2"/>
+      <stop offset="0.52" stop-color="#9C78FF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#9C78FF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="illumination" cx="50%" cy="20%" r="74%">
+      <stop stop-color="#16D9F4" stop-opacity="0.14"/>
+      <stop offset="0.43" stop-color="#9E72FF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#060913" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    <clipPath id="panelClip">
+      <rect x="54" y="34" width="1092" height="362" rx="26"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1200" height="430" rx="30" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1198" height="428" rx="29" stroke="#132432" stroke-width="2"/>
+  <rect width="1200" height="430" rx="30" fill="url(#illumination)"/>
+
+  <g opacity="0.65">
+    <path d="M0 348H1200" stroke="#0E1B28"/>
+    <path d="M0 382H1200" stroke="#0E1B28"/>
+    <path d="M180 0V430M364 0V430M548 0V430M732 0V430M916 0V430M1100 0V430" stroke="#0C1724"/>
+  </g>
+
+  <g clip-path="url(#panelClip)">
+    <rect x="54" y="34" width="1092" height="362" rx="26" fill="url(#surface)" stroke="#173243"/>
+    <rect x="54" y="34" width="1092" height="58" fill="#071019" fill-opacity="0.85"/>
+    <path d="M54 92H1146" stroke="#17303D"/>
+
+    <g>
+      <rect x="81" y="55" width="20" height="16" rx="4" stroke="#29D9EC" stroke-width="2"/>
+      <path d="M86 55V51H96V55" stroke="#29D9EC" stroke-width="2"/>
+      <text x="113" y="70" fill="#F5FAFF" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">NewCloud</text>
+      <text x="255" y="69" fill="#8DA7BA" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing="2">PRIVATE STORAGE CONTROL PLANE</text>
+      <rect x="987" y="51" width="121" height="27" rx="13.5" fill="#10232D" stroke="#19404F"/>
+      <circle cx="1007" cy="64.5" r="5" fill="#35E2B3">
+        <animate attributeName="opacity" values="1;0.36;1" dur="2.2s" repeatCount="indefinite"/>
+      </circle>
+      <text x="1020" y="69" fill="#C4D8E4" font-family="Arial, Helvetica, sans-serif" font-size="12">SYSTEM READY</text>
+    </g>
+
+    <g transform="translate(82 125)">
+      <text fill="#ECF5FD" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">Your private cloud,</text>
+      <text y="53" fill="url(#cyanPurple)" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">running like an OS.</text>
+      <text y="94" fill="#8CA4B6" font-family="Arial, Helvetica, sans-serif" font-size="14">Self-hosted storage with resilient uploads, signed media,</text>
+      <text y="119" fill="#8CA4B6" font-family="Arial, Helvetica, sans-serif" font-size="14">deduplicated blobs, and integrity-first workers.</text>
+      <rect y="145" width="202" height="40" rx="20" fill="#122631" stroke="#1F6070"/>
+      <text x="23" y="170" fill="#DEF9FD" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">docker compose up -d</text>
+    </g>
+
+    <g transform="translate(625 119)">
+      <rect width="456" height="230" rx="18" fill="#070F18" stroke="#142D3B"/>
+      <path d="M0 47H456" stroke="#162D3A"/>
+      <circle cx="22" cy="23" r="5" fill="#E56569"/>
+      <circle cx="40" cy="23" r="5" fill="#E9BE54"/>
+      <circle cx="58" cy="23" r="5" fill="#35D59C"/>
+      <text x="82" y="28" fill="#86A1B3" font-family="Arial, Helvetica, sans-serif" font-size="12">newcloud.local / deployment</text>
+
+      <text x="22" y="75" fill="#819AAE" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="1">SERVICES</text>
+      <text x="358" y="75" fill="#819AAE" font-family="Arial, Helvetica, sans-serif" font-size="11" letter-spacing="1">STATUS</text>
+
+      <g font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#D8E7F1">
+        <text x="22" y="107">frontend</text>
+        <text x="22" y="138">backend</text>
+        <text x="22" y="169">postgres + redis</text>
+        <text x="22" y="200">integrity workers</text>
+      </g>
+      <g>
+        <rect x="350" y="92" width="83" height="22" rx="11" fill="#0D2924" stroke="#175343"/>
+        <rect x="350" y="123" width="83" height="22" rx="11" fill="#0D2924" stroke="#175343"/>
+        <rect x="350" y="154" width="83" height="22" rx="11" fill="#0D2924" stroke="#175343"/>
+        <rect x="350" y="185" width="83" height="22" rx="11" fill="#0D2924" stroke="#175343"/>
+        <g fill="#3BE0B2">
+          <circle cx="365" cy="103" r="4"/>
+          <circle cx="365" cy="134" r="4"/>
+          <circle cx="365" cy="165" r="4"/>
+          <circle cx="365" cy="196" r="4"/>
+        </g>
+        <g fill="#C4EBDD" font-family="Arial, Helvetica, sans-serif" font-size="11">
+          <text x="375" y="107">healthy</text>
+          <text x="375" y="138">ready</text>
+          <text x="375" y="169">private</text>
+          <text x="375" y="200">active</text>
+        </g>
+      </g>
+
+      <g opacity="0.8">
+        <path d="M138 103H327" stroke="#112A36" stroke-width="2"/>
+        <path d="M138 134H327" stroke="#112A36" stroke-width="2"/>
+        <path d="M138 165H327" stroke="#112A36" stroke-width="2"/>
+        <path d="M138 196H327" stroke="#112A36" stroke-width="2"/>
+        <path d="M150 103H225" stroke="#24D4EB" stroke-width="2" stroke-linecap="round" stroke-dasharray="34 84">
+          <animate attributeName="stroke-dashoffset" from="0" to="-118" dur="2.7s" repeatCount="indefinite"/>
+        </path>
+        <path d="M150 134H242" stroke="#6FA9FF" stroke-width="2" stroke-linecap="round" stroke-dasharray="42 100">
+          <animate attributeName="stroke-dashoffset" from="0" to="-142" dur="3.2s" repeatCount="indefinite"/>
+        </path>
+        <path d="M150 165H278" stroke="#A274FF" stroke-width="2" stroke-linecap="round" stroke-dasharray="52 128">
+          <animate attributeName="stroke-dashoffset" from="0" to="-180" dur="3.8s" repeatCount="indefinite"/>
+        </path>
+        <path d="M150 196H295" stroke="#3BE0B2" stroke-width="2" stroke-linecap="round" stroke-dasharray="64 145">
+          <animate attributeName="stroke-dashoffset" from="0" to="-209" dur="3.1s" repeatCount="indefinite"/>
+        </path>
+      </g>
+    </g>
+
+    <rect x="54" y="-110" width="1092" height="100" fill="url(#sweep)" opacity="0.75">
+      <animate attributeName="y" from="-110" to="475" dur="5.5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <path d="M55 395H1145" stroke="url(#cyanPurple)" stroke-opacity="0.3"/>
+  <path d="M244 395H502" stroke="#18D8F1" stroke-width="2" stroke-linecap="round" filter="url(#softGlow)" opacity="0.8">
+    <animate attributeName="opacity" values="0.2;0.9;0.2" dur="3.4s" repeatCount="indefinite"/>
+  </path>
+  <path d="M752 395H980" stroke="#9870FF" stroke-width="2" stroke-linecap="round" filter="url(#softGlow)" opacity="0.7">
+    <animate attributeName="opacity" values="0.75;0.18;0.75" dur="3.4s" repeatCount="indefinite"/>
+  </path>
+</svg>
