@@ -9,7 +9,6 @@ import { fileTypeService } from "./fileTypeService";
 import { storageBlobService } from "./storageBlobService";
 import { storageAccountingService } from "./storageAccountingService";
 import { thumbnailService } from "./thumbnailService";
-import { config } from "../config";
 import { NotFoundError, ForbiddenError, BadRequestError } from "../utils/errors";
 
 export class FileService {
@@ -28,11 +27,6 @@ export class FileService {
     const fileInfo = fileTypeService.getFileInfo(file.originalname, file.mimetype);
     const category = fileInfo.category;
     const mimeType = fileInfo.mimeType;
-
-    if (config.blockDangerousUploads && fileTypeService.isDangerous(mimeType, ext)) {
-      try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch {}
-      throw new BadRequestError(`File type ${ext || mimeType} is not allowed for security reasons`);
-    }
 
     const storedName = `${uuidv4()}${ext}`;
     const tempPath = file.path;

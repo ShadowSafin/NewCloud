@@ -308,8 +308,10 @@ sequenceDiagram
 ```
 
 The upload middleware enforces `MAX_FILE_SIZE` and creates files on disk rather than
-buffering them in process memory. When `BLOCK_DANGEROUS_UPLOADS=true`, high-risk file
-types are rejected before finalization.
+buffering them in process memory. File extensions are metadata rather than an allowlist:
+custom formats and executable payloads may be stored as opaque objects. Known claimed
+preview formats still pass binary signature checks, and risky content is sandboxed when
+delivered.
 
 ### Chunk Session Pipeline
 
@@ -333,7 +335,7 @@ sequenceDiagram
   C->>API: POST /api/uploads/:id/complete
   API->>Q: Enqueue chunk-merge
   W->>W: Stream merge and compute SHA-256
-  W->>W: Validate signature/danger policy
+  W->>W: Validate known claimed signatures
   W->>B: Ingest immutable blob
   W->>DB: Transaction: File, session completion, accounting
   W-->>Q: Completed
@@ -345,8 +347,8 @@ sequenceDiagram
 - The server exposes session status and resume information.
 - The frontend persists transfer metadata but cannot persist browser `File` objects;
   an interrupted page instance therefore cancels stale in-progress UI tasks on recovery.
-- The chunk cleanup worker removes chunk files for sessions inactive for more than
-  24 hours and marks eligible sessions cancelled.
+- The chunk cleanup worker removes registered chunks and abandoned `chunks-tmp` files
+  older than 24 hours, then marks eligible sessions cancelled.
 - Merge jobs refuse completed/cancelled sessions and fail if a required chunk is absent.
 
 ## File and Folder Mutations
@@ -443,7 +445,7 @@ headers for content categories that could execute or embed active payloads.
 | `reference-verification` | Set each blob count to actual file plus version references.                   | Startup and daily cron.                          |
 | `metadata-repair`        | Correct blob-backed file path/hash/size and migrate legacy records.           | Startup and daily cron.                          |
 | `orphan-blob-cleanup`    | Remove zero-reference blob rows and binaries.                                 | Daily cron.                                      |
-| `chunk-cleanup`          | Remove stale part files and cancel stale sessions.                            | Every 30 minutes.                                |
+| `chunk-cleanup`          | Remove stale/abandoned part files and cancel stale sessions.                  | Every 30 minutes.                                |
 
 ### Scheduled Jobs
 
@@ -533,7 +535,7 @@ These observations are important when planning production work:
 | Area                             | Current state                                                                                                   |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | WebSocket updates                | Infrastructure is implemented; service mutation event emission is not yet wired.                                |
-| Dangerous uploads                | Deployment configuration rejects known dangerous uploads by default; administrators can explicitly change it.    |
+| Arbitrary file formats           | All extensions are accepted for storage; risky/unknown content is sandboxed when delivered inline.               |
 | Quotas                           | `storageQuota` is modeled and shown, while request quota middleware currently permits unlimited use.            |
 | Public share passwords           | Password-protected public requests pass the password as a query parameter in the current frontend/API contract. |
 | WebSocket auth                   | A JWT query-token compatibility path remains and should be replaced before untrusted exposure.                  |

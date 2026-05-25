@@ -55,6 +55,8 @@ export function PreviewModal({
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [streamUrl, setStreamUrl] = useState<string>("");
   const [downloadUrl, setDownloadUrl] = useState<string>("");
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const fileTypeInfo = file ? getFileTypeInfo(file.category) : null;
@@ -68,19 +70,34 @@ export function PreviewModal({
   const isText = isCode || isMarkdown || isJson;
 
   useEffect(() => {
+    let cancelled = false;
+
     setZoom(1);
     setTextContent("");
     setHighlightedHtml("");
     setStreamUrl("");
     setDownloadUrl("");
+    setMediaLoading(Boolean(file && isOpen && !isText));
+    setMediaError(false);
 
     if (file && isOpen) {
       mediaApi.sign(file.id, "stream")
-        .then((res) => setStreamUrl(res.data.data.url))
-        .catch(() => setStreamUrl(""));
+        .then((res) => {
+          if (!cancelled) setStreamUrl(res.data.data.url);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setMediaLoading(false);
+            setMediaError(true);
+          }
+        });
       mediaApi.sign(file.id, "download")
-        .then((res) => setDownloadUrl(res.data.data.url))
-        .catch(() => setDownloadUrl(""));
+        .then((res) => {
+          if (!cancelled) setDownloadUrl(res.data.data.url);
+        })
+        .catch(() => {
+          if (!cancelled) setDownloadUrl("");
+        });
     }
 
     if (file && isText && isOpen) {
@@ -114,7 +131,11 @@ export function PreviewModal({
         .catch(() => setTextContent("Failed to load file content"))
         .finally(() => setTextLoading(false));
     }
-  }, [file, isOpen]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [file, isOpen, isText, isJson, isMarkdown]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -141,8 +162,23 @@ export function PreviewModal({
     if (downloadUrl) window.open(downloadUrl);
   };
 
+  const renderMediaLoading = () => (
+    <div className="flex min-h-[240px] items-center justify-center bg-canvas">
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-hairline border-t-cyan-300" />
+    </div>
+  );
+
+  const renderMediaError = () => (
+    <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 bg-canvas px-6 text-center">
+      <p className="text-sm text-ink">Preview could not be loaded</p>
+      <p className="text-xs text-body-mid">Download the file or reopen the preview to retry.</p>
+    </div>
+  );
+
   const renderPreview = () => {
     if (isImage) {
+      if (mediaError) return renderMediaError();
+      if (!streamUrl) return renderMediaLoading();
       return (
         <div className="relative flex items-center justify-center overflow-hidden min-h-[200px] bg-canvas">
           <img
@@ -150,48 +186,74 @@ export function PreviewModal({
             alt={file.originalName}
             className="max-w-full max-h-[70vh] w-auto h-auto object-contain transition-transform"
             style={{ transform: `scale(${zoom})` }}
+            onLoad={() => setMediaLoading(false)}
+            onError={() => {
+              setMediaLoading(false);
+              setMediaError(true);
+            }}
           />
+          {mediaLoading && <div className="absolute inset-0">{renderMediaLoading()}</div>}
         </div>
       );
     }
 
     if (isVideo) {
+      if (mediaError) return renderMediaError();
+      if (!streamUrl) return renderMediaLoading();
       return (
         <div className="flex items-center justify-center bg-canvas" style={{ height: "70vh" }}>
           <video
             ref={videoRef}
-            key={file.id}
+            key={`${file.id}:${streamUrl}`}
+            src={streamUrl}
             className="w-full h-full object-contain"
             controls
             preload="metadata"
             playsInline
-          >
-            <source src={streamUrl} type={file.mimeType} />
-          </video>
+            onLoadedMetadata={() => setMediaLoading(false)}
+            onError={() => {
+              setMediaLoading(false);
+              setMediaError(true);
+            }}
+          />
         </div>
       );
     }
 
     if (isAudio) {
+      if (mediaError) return renderMediaError();
+      if (!streamUrl) return renderMediaLoading();
       return (
         <div className="flex flex-col items-center justify-center p-12 bg-canvas w-full">
           <div className="w-20 h-20 rounded-full bg-canvas-soft border border-hairline flex items-center justify-center mb-6">
             <span className="text-3xl">🎵</span>
           </div>
           <p className="text-sm text-ink mb-6 truncate max-w-md">{file.originalName}</p>
-          <audio ref={videoRef} controls className="w-full max-w-md">
-            <source src={streamUrl} type={file.mimeType} />
-          </audio>
+          <audio
+            ref={videoRef}
+            key={`${file.id}:${streamUrl}`}
+            src={streamUrl}
+            controls
+            className="w-full max-w-md"
+            onLoadedMetadata={() => setMediaLoading(false)}
+            onError={() => {
+              setMediaLoading(false);
+              setMediaError(true);
+            }}
+          />
         </div>
       );
     }
 
     if (isPdf) {
+      if (mediaError) return renderMediaError();
+      if (!streamUrl) return renderMediaLoading();
       return (
         <iframe
           src={streamUrl}
           className="w-full h-[70vh] border-0"
           title={file.originalName}
+          onLoad={() => setMediaLoading(false)}
         />
       );
     }

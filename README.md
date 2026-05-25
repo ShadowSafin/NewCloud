@@ -93,7 +93,7 @@ NexxCloud sits between a personal NAS and a modern hosted drive:
 | Deduplication             | Identical uploads increment a blob reference count instead of reusing another file's stored filename or copying bytes.                                                  |
 | Direct uploads            | Multipart uploads stream to a temporary file on disk through Multer rather than accumulating the entire payload in memory.                                              |
 | Chunked uploads           | Files larger than 10 MiB in the frontend are divided into server-sized chunks, hashed, retried, merged in a BullMQ worker, and finalized into blob storage.             |
-| Upload validation         | Known binary signatures are checked for formats such as PNG, JPEG, GIF, WebP, PDF, ZIP-family documents, and MP4-family media. Dangerous file blocking is configurable. |
+| Upload validation         | Every extension, including custom and executable formats, is stored as opaque content; claimed preview formats still receive signature checks and active content is sandboxed on delivery. |
 | Signed media access       | Authenticated clients request five-minute media URLs for preview, thumbnail, and download flows without placing access JWTs in media element URLs.                      |
 | File management           | Nested logical folders, breadcrumb navigation, rename, move, copy, favorites, trash, permanent removal, bulk actions, and versions.                                     |
 | Sharing                   | Public share tokens support optional password protection and expiration.                                                                                                |
@@ -232,8 +232,8 @@ Persistent data remains in the PostgreSQL and Redis named volumes and in the bin
 
 When upgrading an existing development installation, `setup.sh` and `setup.bat` preserve
 explicit values already present in `.env`. Before exposing that installation outside a
-trusted LAN, set `NODE_ENV=production`, replace any weak secrets, enable
-`BLOCK_DANGEROUS_UPLOADS=true`, and configure HTTPS proxy origins.
+trusted LAN, set `NODE_ENV=production`, replace any weak secrets, and configure HTTPS
+proxy origins.
 
 ## Deployment Targets
 
@@ -259,8 +259,8 @@ openssl rand -hex 32
 ```
 
 Required variables are `DB_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET`,
-`MEDIA_TOKEN_SECRET`, and `BULL_BOARD_PASSWORD`. Keep `NODE_ENV=production` and
-`BLOCK_DANGEROUS_UPLOADS=true`. Missing or weak values cause application startup to fail.
+`MEDIA_TOKEN_SECRET`, and `BULL_BOARD_PASSWORD`. Keep `NODE_ENV=production`.
+Missing or weak values cause application startup to fail.
 
 <details>
 <summary><strong>Portainer Git stack</strong></summary>
@@ -356,9 +356,8 @@ Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 | `FRONTEND_URL`                  | Allowed frontend origin seed for CORS                                | `http://localhost:3000`                  |
 | `STORAGE_ROOT`                  | Root for blobs, uploads, and thumbnails                              | `/app/data/storage`                      |
 | `MAX_FILE_SIZE`                 | Maximum accepted whole upload in bytes                               | `1099511627776` (1 TiB)                  |
-| `UPLOAD_CHUNK_SIZE`             | Chunk size returned when a session is initiated                      | `16777216` (16 MiB)                      |
+| `UPLOAD_CHUNK_SIZE`             | Chunk size returned when a session is initiated                      | `8388608` (8 MiB; safe via UI proxy)     |
 | `MAX_UPLOAD_CHUNK_SIZE`         | Multer ceiling for an individual chunk                               | `268435456` (256 MiB)                    |
-| `BLOCK_DANGEROUS_UPLOADS`       | Reject executable/dangerous extensions and MIME types                | `true` in deployments                    |
 | `TRASH_RETENTION_DAYS`          | Scheduled trash removal age                                          | `30`                                     |
 | `MAX_VERSIONS_PER_FILE`         | Version retention target per file                                    | `10`                                     |
 | `JWT_SECRET`                    | Access-token signing secret                                          | Required; strong in production           |
@@ -506,8 +505,8 @@ The browser sends files larger than 10 MiB through the chunk pipeline:
 
 Important deployment guidance:
 
-- Keep `BLOCK_DANGEROUS_UPLOADS=true` unless an administrator deliberately accepts the
-  risk of storing executable content.
+- NexxCloud accepts arbitrary file formats as stored content. Treat shared executable or
+  active-document files with the same caution you would apply to downloaded attachments.
 - Terminate HTTPS before exposing NexxCloud beyond a trusted local network.
 - Protect `/admin/queues` with a strong unique password and restrict it at the proxy when possible.
 - Back up PostgreSQL metadata and the entire `data/storage` tree together.

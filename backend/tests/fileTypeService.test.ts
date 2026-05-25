@@ -39,6 +39,20 @@ describe("fileTypeService signature validation", () => {
     await expect(fileTypeService.validateSignature(filePath, "application/pdf")).resolves.toBe(false);
   });
 
+  it("accepts an opaque custom file format without a known signature", async () => {
+    const filePath = await writeTempFile(
+      "project.nexxformat",
+      Buffer.from([0x4e, 0x45, 0x58, 0x58, 0x01, 0x00, 0xff])
+    );
+
+    await expect(fileTypeService.validateSignature(filePath, "application/x-nexxformat")).resolves.toBe(true);
+    expect(fileTypeService.getFileInfo("project.nexxformat", "application/octet-stream")).toMatchObject({
+      category: "unknown",
+      extension: ".nexxformat",
+      canPreview: false,
+    });
+  });
+
   it("flags dangerous upload types by extension or mime", () => {
     expect(fileTypeService.isDangerous("application/x-msdownload", ".txt")).toBe(true);
     expect(fileTypeService.isDangerous("text/plain", ".exe")).toBe(true);

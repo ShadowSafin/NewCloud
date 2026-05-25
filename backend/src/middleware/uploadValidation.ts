@@ -1,19 +1,8 @@
 import { Response, NextFunction } from "express";
 import fs from "fs";
-import path from "path";
 import { AuthenticatedRequest } from "../types";
 import { BadRequestError } from "../utils/errors";
 import { fileTypeService } from "../services/fileTypeService";
-import { config } from "../config";
-
-// Dangerous file types can be rejected by policy, but are allowed by default
-// so NexxCloud can store arbitrary user files while still avoiding inline execution.
-const DANGEROUS_EXTENSIONS = new Set([
-  ".exe", ".bat", ".cmd", ".com", ".msi", ".scr", ".pif",
-  ".vbs", ".vbe", ".js", ".jse", ".ws", ".wsf", ".wsc",
-  ".ps1", ".psm1", ".psd1", ".ps1xml", ".pssc", ".psrc",
-  ".reg", ".dll", ".sys", ".drv",
-]);
 
 // MIME type magic bytes for verification
 const MAGIC_BYTES: { mime: string; bytes: number[] }[] = [
@@ -27,19 +16,12 @@ const MAGIC_BYTES: { mime: string; bytes: number[] }[] = [
 ];
 
 /**
- * Validate uploaded file safety:
- * 1. Check file extension against dangerous types
- * 2. Verify MIME type matches magic bytes (for common types)
+ * Validate claimed recognized file types without restricting storage formats.
+ * Arbitrary, custom, and executable extensions are valid opaque user content.
  */
 export async function validateUpload(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const file = req.file;
   if (!file) return next();
-
-  // Check extension
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (config.blockDangerousUploads && (DANGEROUS_EXTENSIONS.has(ext) || fileTypeService.isDangerous(file.mimetype || "", ext))) {
-    await rejectUploadedFile(file, `File type ${ext} is not allowed for security reasons`);
-  }
 
   // Verify magic bytes for common types
   if (file.buffer && file.buffer.length >= 8) {

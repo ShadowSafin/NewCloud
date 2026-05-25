@@ -1,7 +1,38 @@
 import { Worker } from "bullmq";
 import fs from "fs";
+import path from "path";
 import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
+import { storageService } from "../services/storageService";
+
+async function cleanupTemporaryChunks(cutoff: Date): Promise<number> {
+  let temporaryChunksDeleted = 0;
+  const storageRoot = path.dirname(storageService.getBlobsPath());
+
+  const userDirectories = await fs.promises.readdir(storageRoot, { withFileTypes: true }).catch(() => []);
+  for (const directory of userDirectories) {
+    if (!directory.isDirectory()) continue;
+
+    const tempDirectory = path.join(storageRoot, directory.name, "uploads", "chunks-tmp");
+    if (!storageService.isSafePathGlobal(tempDirectory)) continue;
+
+    const entries = await fs.promises.readdir(tempDirectory, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".chunk")) continue;
+
+      const tempPath = path.join(tempDirectory, entry.name);
+      try {
+        const stats = await fs.promises.stat(tempPath);
+        if (stats.mtime < cutoff) {
+          await fs.promises.unlink(tempPath);
+          temporaryChunksDeleted++;
+        }
+      } catch {}
+    }
+  }
+
+  return temporaryChunksDeleted;
+}
 
 export function createChunkCleanupWorker(): Worker {
   const worker = new Worker(
@@ -34,10 +65,14 @@ export function createChunkCleanupWorker(): Worker {
         }
       }
 
-      if (chunksDeleted > 0) {
-        console.warn(`[Integrity] Cleaned up ${chunksDeleted} stale upload chunk(s)`);
+      const temporaryChunksDeleted = await cleanupTemporaryChunks(cutoff);
+
+      if (chunksDeleted > 0 || temporaryChunksDeleted > 0) {
+        console.warn(
+          `[Integrity] Cleaned up ${chunksDeleted} stale upload chunk(s) and ${temporaryChunksDeleted} abandoned temporary chunk(s)`
+        );
       }
-      return { sessions: staleSessions.length, chunksDeleted };
+      return { sessions: staleSessions.length, chunksDeleted, temporaryChunksDeleted };
     },
     { connection: createRedisConnection(), concurrency: 1 }
   );

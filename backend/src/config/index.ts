@@ -40,13 +40,12 @@ const parsePositiveInteger = (name: string, value: string | undefined, fallback:
 };
 
 const maxFileSize = parsePositiveInteger("MAX_FILE_SIZE", process.env.MAX_FILE_SIZE, "1099511627776");
-const uploadChunkSize = parsePositiveInteger("UPLOAD_CHUNK_SIZE", process.env.UPLOAD_CHUNK_SIZE, "16777216");
+const uploadChunkSize = parsePositiveInteger("UPLOAD_CHUNK_SIZE", process.env.UPLOAD_CHUNK_SIZE, "8388608");
 const maxUploadChunkSize = parsePositiveInteger(
   "MAX_UPLOAD_CHUNK_SIZE",
   process.env.MAX_UPLOAD_CHUNK_SIZE,
   "268435456"
 );
-const blockDangerousUploads = process.env.BLOCK_DANGEROUS_UPLOADS === "true";
 const corsOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
@@ -74,7 +73,6 @@ export const config = {
   maxFileSize,
   uploadChunkSize,
   maxUploadChunkSize,
-  blockDangerousUploads,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   corsOrigins,
   trustProxy,

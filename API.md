@@ -207,9 +207,10 @@ curl -X POST "$API_URL/files/upload" \
 ```
 
 Direct uploads are written to disk through Multer and then finalized into the blob store.
-They are bounded by `MAX_FILE_SIZE`. Recognized formats pass binary signature validation
-before final file metadata is committed. High-risk file rejection applies when
-`BLOCK_DANGEROUS_UPLOADS=true`.
+They are bounded by `MAX_FILE_SIZE`. Any extension, including custom and executable
+formats, may be stored. Recognized preview formats pass binary signature validation
+before final file metadata is committed; risky or unknown content is sandboxed when
+served inline.
 
 ### Movement, Copies, and Bulk Work
 
@@ -326,14 +327,16 @@ Representative result:
     "sessionId": "<uuid>",
     "filename": "feature-film.mp4",
     "totalSize": "524288000",
-    "chunkSize": 16777216,
-    "totalChunks": 32
+    "chunkSize": 8388608,
+    "totalChunks": 63
   }
 }
 ```
 
 The server rejects non-positive sizes and values over `MAX_FILE_SIZE`. `chunkSize` is
-selected by the server configuration, so clients must use the returned value.
+selected by the server configuration, so clients must use the returned value. The
+deployment default is 8 MiB so multipart chunks safely pass through the Next.js
+same-origin application proxy.
 
 ### Upload a Chunk
 

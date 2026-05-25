@@ -20,10 +20,13 @@ const shouldSandbox = (mimeType: string, extension: string): boolean => {
   const mime = mimeType.toLowerCase();
 
   return (
+    fileTypeService.isDangerous(mimeType, extension) ||
     category === "code" ||
+    category === "executables" ||
     category === "databases" ||
     category === "unknown" ||
     mime.startsWith("text/") ||
+    mime === "image/svg+xml" ||
     [".html", ".htm", ".svg", ".xml", ".js", ".json"].includes(ext)
   );
 };

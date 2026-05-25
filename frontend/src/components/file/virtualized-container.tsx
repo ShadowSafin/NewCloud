@@ -53,17 +53,18 @@ export function VirtualizedContainer<T>({
       return { cols: 1, itemHeight: 54 };
     }
 
-    if (containerWidth >= 1024) return { cols: 5, itemHeight: 172 };
-    if (containerWidth >= 768) return { cols: 4, itemHeight: 172 };
-    if (containerWidth >= 640) return { cols: 3, itemHeight: 178 };
+    let gridColumns: number;
+    if (containerWidth >= 1024) gridColumns = 5;
+    else if (containerWidth >= 768) gridColumns = 4;
+    else if (containerWidth >= 640) gridColumns = 3;
+    else {
+      const minCardWidth = containerWidth < 380 ? 138 : 150;
+      const derivedCols = Math.max(1, Math.floor((containerWidth + gap) / (minCardWidth + gap)));
+      gridColumns = Math.min(2, derivedCols);
+    }
 
-    const minCardWidth = containerWidth < 380 ? 138 : 150;
-    const derivedCols = Math.max(1, Math.floor((containerWidth + gap) / (minCardWidth + gap)));
-    const mobileCols = Math.min(2, derivedCols);
-    return {
-      cols: mobileCols,
-      itemHeight: mobileCols === 1 ? 224 : 210,
-    };
+    const cardWidth = (containerWidth - gap * (gridColumns - 1)) / gridColumns;
+    return { cols: gridColumns, itemHeight: Math.floor(cardWidth) };
   }, [containerWidth, viewMode]);
 
   const maxHeight = containerWidth < 768

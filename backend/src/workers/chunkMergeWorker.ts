@@ -11,7 +11,6 @@ import { fileTypeService } from "../services/fileTypeService";
 import { VersionService } from "../services/versionService";
 import { storageBlobService } from "../services/storageBlobService";
 import { storageAccountingService } from "../services/storageAccountingService";
-import { config } from "../config";
 
 interface ChunkMergeJobData {
   sessionId: string;
@@ -73,11 +72,6 @@ export function createChunkMergeWorker(): Worker {
         writeStream.on("finish", resolve);
         writeStream.on("error", reject);
       });
-
-      if (config.blockDangerousUploads && fileTypeService.isDangerous(session.mimeType, ext)) {
-        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
-        throw new Error(`File type ${ext || session.mimeType} is not allowed for security reasons`);
-      }
 
       // Dynamic Binary Signature Validation (Magic-Number validation)
       const isSignatureValid = await fileTypeService.validateSignature(filePath, session.mimeType);
