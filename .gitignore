@@ -9,6 +9,11 @@ dist/
 .next/
 out/
 
+# The Capacitor wrapper uses a checked-in shell as its WebView entrypoint.
+!mobile/dist/
+!mobile/dist/index.html
+!mobile/dist/newcloud-icon.png
+
 # Environment
 .env
 .env.local
@@ -50,3 +55,8 @@ prisma/migrations/*/migration_lock.toml
 *.pid
 *.seed
 *.pid.lock
+
+# Android release signing credentials
+*.jks
+*.keystore
+**/keystore.properties

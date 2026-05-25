@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import { HardDrive, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,12 +38,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, oklch(0.82 0.16 200), oklch(0.68 0.22 295))" }}
-          >
-            <HardDrive className="w-5 h-5 text-white" strokeWidth={2.5} />
-          </div>
+          <BrandMark className="h-10 w-10 rounded-xl" priority />
           <span className="text-white font-semibold text-lg tracking-tight">NewCloud</span>
         </div>
 
@@ -109,12 +105,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm relative z-10">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-10 lg:hidden">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, oklch(0.82 0.16 200), oklch(0.68 0.22 295))" }}
-            >
-              <HardDrive className="w-4 h-4 text-white" strokeWidth={2.5} />
-            </div>
+            <BrandMark className="h-9 w-9 rounded-xl" priority />
             <span className="text-white font-semibold tracking-tight">NewCloud</span>
           </div>
 

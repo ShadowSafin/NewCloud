@@ -5,6 +5,7 @@ import {
   Activity, FolderTree, Lock, Globe, Code2,
   Github, BookOpen, ArrowRight, Check, HardDrive, History, Trash2, Star,
 } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -495,7 +496,7 @@ export function Footer() {
       <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 md:flex-row md:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--gradient-brand)]"><HardDrive className="h-4 w-4 text-background" strokeWidth={2.5}/></div>
+            <BrandMark className="h-8 w-8" />
             <span className="font-display text-lg font-semibold">NewCloud</span>
           </div>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">The modern self-hosted cloud storage platform. Own your data.</p>

@@ -12,12 +12,14 @@ import {
 } from "./Sections";
 
 export function LandingPage() {
+  const isMobileShell = useMobileShell();
+
   return (
-    <div className="apex-root apex-body relative min-h-screen overflow-x-clip font-sans antialiased">
+    <div className={`apex-root apex-body relative min-h-screen overflow-x-clip font-sans antialiased${isMobileShell ? " apex-mobile-shell" : ""}`}>
       <AmbientBackground />
-      <Nav />
+      <Nav stableCompositing={isMobileShell} />
       <main>
-        <Hero />
+        <Hero isMobileShell={isMobileShell} />
         <Marquee />
         <Features />
         <SelfHost />
@@ -36,10 +38,9 @@ export function LandingPage() {
   );
 }
 
-function Hero() {
+function Hero({ isMobileShell }: { isMobileShell: boolean }) {
   const heroRef = useRef<HTMLElement | null>(null);
   const shouldReduceMotion = Boolean(useReducedMotion());
-  const isMobileShell = useMobileShell();
   const stabilizeVideoLayer = shouldReduceMotion || isMobileShell;
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -66,37 +67,61 @@ function Hero() {
   const dashboardRotateX = useTransform(cinematicProgress, [0, 0.62, 1], stabilizeVideoLayer ? [0, 0, 0] : [8, -5, -2]);
 
   return (
-    <section ref={heroRef} className="relative md:min-h-[230vh]">
+    <section ref={heroRef} data-newcloud-hero className="relative md:min-h-[230vh]">
       <div className="relative min-h-[100svh] overflow-hidden px-5 pb-14 pt-24 md:sticky md:top-0 md:min-h-screen md:px-6 md:pb-16 md:pt-32">
-        <motion.div
-          aria-hidden
-          style={{ y: glowY, opacity: glowOpacity }}
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_64%_at_50%_16%,rgba(100,210,255,0.24),transparent_58%),linear-gradient(130deg,rgba(37,99,235,0.16),transparent_34%,rgba(168,85,247,0.14)_72%,transparent)]"
-        />
+        {stabilizeVideoLayer ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(ellipse_90%_64%_at_50%_16%,rgba(100,210,255,0.24),transparent_58%),linear-gradient(130deg,rgba(37,99,235,0.16),transparent_34%,rgba(168,85,247,0.14)_72%,transparent)]"
+          />
+        ) : (
+          <motion.div
+            aria-hidden
+            style={{ y: glowY, opacity: glowOpacity }}
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_64%_at_50%_16%,rgba(100,210,255,0.24),transparent_58%),linear-gradient(130deg,rgba(37,99,235,0.16),transparent_34%,rgba(168,85,247,0.14)_72%,transparent)]"
+          />
+        )}
 
-        <motion.div
-          aria-hidden
-          data-newcloud-hero-video-layer
-          style={{ y: videoY, scale: videoScale, opacity: videoOpacity }}
-          className="pointer-events-none absolute inset-[-8%] will-change-transform"
-        >
-          {shouldReduceMotion ? (
-            <img
-              src="/media/newcloud-hero-poster.jpg"
-              alt=""
-              className="h-full w-full scale-105 object-cover object-center"
-              draggable={false}
-            />
-          ) : (
-            <HeroVideo key={isMobileShell ? "mobile-shell" : "browser"} preferMobileSources={isMobileShell} />
-          )}
-        </motion.div>
+        {stabilizeVideoLayer ? (
+          <div
+            aria-hidden
+            data-newcloud-hero-video-layer
+            className="apex-mobile-video-layer pointer-events-none absolute inset-[-8%] opacity-[0.92]"
+          >
+            {shouldReduceMotion ? (
+              <img
+                src="/media/newcloud-hero-poster.jpg"
+                alt=""
+                className="h-full w-full object-cover object-center"
+                draggable={false}
+              />
+            ) : (
+              <HeroVideo preferMobileSources={isMobileShell} stableCompositing={isMobileShell} />
+            )}
+          </div>
+        ) : (
+          <motion.div
+            aria-hidden
+            data-newcloud-hero-video-layer
+            style={{ y: videoY, scale: videoScale, opacity: videoOpacity }}
+            className="pointer-events-none absolute inset-[-8%] will-change-transform"
+          >
+            <HeroVideo preferMobileSources={false} />
+          </motion.div>
+        )}
 
-        <motion.div
-          aria-hidden
-          style={{ opacity: overlayOpacity }}
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,12,0.56)_0%,rgba(5,7,17,0.5)_38%,rgba(8,10,22,0.86)_100%)]"
-        />
+        {stabilizeVideoLayer ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,12,0.62)_0%,rgba(5,7,17,0.58)_38%,rgba(8,10,22,0.88)_100%)]"
+          />
+        ) : (
+          <motion.div
+            aria-hidden
+            style={{ opacity: overlayOpacity }}
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,12,0.56)_0%,rgba(5,7,17,0.5)_38%,rgba(8,10,22,0.86)_100%)]"
+          />
+        )}
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_38%_at_50%_44%,transparent_0%,rgba(0,0,0,0.34)_72%,rgba(0,0,0,0.76)_100%)]" />
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.55),transparent_18%,transparent_82%,rgba(0,0,0,0.55))]" />
         <div aria-hidden className={isMobileShell ? "pointer-events-none absolute inset-0 bg-black/16" : "pointer-events-none absolute inset-0 bg-black/10 backdrop-blur-[1px]"} />
@@ -104,14 +129,14 @@ function Hero() {
 
         <div className="relative z-10 mx-auto flex min-h-[calc(100svh-6rem)] max-w-7xl flex-col items-center justify-start pt-[3vh] text-center md:min-h-[calc(100vh-7rem)] md:pt-[8vh]">
           <motion.div
-            style={{ y: textY, opacity: textOpacity, scale: textScale }}
-            className="mx-auto max-w-5xl will-change-transform"
+            style={stabilizeVideoLayer ? undefined : { y: textY, opacity: textOpacity, scale: textScale }}
+            className={`mx-auto max-w-5xl${stabilizeVideoLayer ? "" : " will-change-transform"}`}
           >
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-xs text-white/76 shadow-[0_0_30px_rgba(90,180,255,0.18)] backdrop-blur-2xl"
+              className="apex-mobile-frost mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-3 py-1 text-xs text-white/76 shadow-[0_0_30px_rgba(90,180,255,0.18)] backdrop-blur-2xl"
             >
               <span className="grid h-4 w-4 place-items-center rounded-full bg-white text-[10px] text-slate-950">v1</span>
               NewCloud cinematic self-hosted cloud
@@ -206,7 +231,13 @@ function useMobileShell() {
   return isMobileShell;
 }
 
-function HeroVideo({ preferMobileSources }: { preferMobileSources: boolean }) {
+function HeroVideo({
+  preferMobileSources,
+  stableCompositing = false,
+}: {
+  preferMobileSources: boolean;
+  stableCompositing?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -274,15 +305,20 @@ function HeroVideo({ preferMobileSources }: { preferMobileSources: boolean }) {
 
   return (
     <>
-      <img
-        src="/media/newcloud-hero-poster.jpg"
-        alt=""
-        className={`absolute inset-0 h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
-        draggable={false}
-      />
+      {!stableCompositing && (
+        <img
+          src="/media/newcloud-hero-poster.jpg"
+          alt=""
+          className={`absolute inset-0 h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
+          draggable={false}
+        />
+      )}
       <video
         ref={videoRef}
-        className={`h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready || preferMobileSources ? "opacity-100" : "opacity-0"}`}
+        data-newcloud-hero-video
+        className={stableCompositing
+          ? "apex-mobile-hero-video block h-full w-full object-cover object-center"
+          : `h-full w-full scale-105 object-cover object-center transition-opacity duration-700 ${ready || preferMobileSources ? "opacity-100" : "opacity-0"}`}
         autoPlay
         muted
         loop

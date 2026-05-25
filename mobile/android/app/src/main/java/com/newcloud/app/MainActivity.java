@@ -1,6 +1,7 @@
 package com.newcloud.app;
 
 import android.os.Bundle;
+import android.graphics.Color;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -23,6 +24,7 @@ public class MainActivity extends BridgeActivity {
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        webView.setBackgroundColor(Color.rgb(6, 1, 41));
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         webView.setNestedScrollingEnabled(true);
         webView.setVerticalScrollBarEnabled(false);

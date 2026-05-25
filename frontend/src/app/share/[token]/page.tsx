@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { publicSharesApi } from "@/lib/publicApi";
 import { formatFileSize } from "@/lib/fileTypes";
-import { Download, Lock, FileX, HardDrive } from "lucide-react";
+import { Download, Lock, FileX } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 
 interface ShareData {
   file: { id: string; originalName: string; mimeType: string; size: number };
@@ -79,10 +80,8 @@ export default function SharePage() {
       {/* Header */}
       <header className="border-b border-hairline">
         <div className="max-w-4xl mx-auto px-6 h-14 flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full border border-hairline flex items-center justify-center">
-            <HardDrive className="w-3.5 h-3.5 text-ink" />
-          </div>
-          <span className="text-sm text-ink">CloudStore</span>
+          <BrandMark className="h-7 w-7 rounded-full" priority />
+          <span className="text-sm text-ink">NewCloud</span>
           <span className="text-xs text-body-mid">Shared File</span>
         </div>
       </header>

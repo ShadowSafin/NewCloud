@@ -8,7 +8,9 @@
     "sync": "npx cap sync",
     "android:sync": "npx cap sync android",
     "android:apk": "npm run android:sync && powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 assembleDebug",
+    "android:apk:release": "npm run android:sync && powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 assembleRelease",
     "android:aab": "npm run android:sync && powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 bundleDebug",
+    "android:aab:release": "npm run android:sync && powershell -ExecutionPolicy Bypass -File scripts/android-build.ps1 bundleRelease",
     "ios:sync": "npx cap sync ios",
     "open:android": "npx cap open android",
     "open:ios": "npx cap open ios"

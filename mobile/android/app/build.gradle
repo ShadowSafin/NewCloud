@@ -1,5 +1,22 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningProperties = new Properties()
+def releaseSigningPropertiesFile = rootProject.file('keystore.properties')
+if (releaseSigningPropertiesFile.exists()) {
+    releaseSigningPropertiesFile.withInputStream { releaseSigningProperties.load(it) }
+}
+
+def releaseStoreFile = releaseSigningProperties.getProperty('storeFile') ?: System.getenv('NEWCLOUD_ANDROID_STORE_FILE')
+def releaseStorePassword = releaseSigningProperties.getProperty('storePassword') ?: System.getenv('NEWCLOUD_ANDROID_STORE_PASSWORD')
+def releaseKeyAlias = releaseSigningProperties.getProperty('keyAlias') ?: System.getenv('NEWCLOUD_ANDROID_KEY_ALIAS')
+def releaseKeyPassword = releaseSigningProperties.getProperty('keyPassword') ?: System.getenv('NEWCLOUD_ANDROID_KEY_PASSWORD')
+def releaseSigningConfigured = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
+def requestedReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+
+if (requestedReleaseBuild && !releaseSigningConfigured) {
+    throw new GradleException('Release signing is not configured. Provide mobile/android/keystore.properties or NEWCLOUD_ANDROID_* environment variables.')
+}
+
 android {
     namespace "com.newcloud.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -16,8 +33,21 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (releaseSigningConfigured) {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

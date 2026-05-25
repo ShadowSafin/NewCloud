@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" href="./newcloud-icon.png">
+  <title>NewCloud Mobile</title>
+  <style>
+    :root {
+      --bg: #03050d;
+      --panel: rgba(255, 255, 255, 0.06);
+      --panel-strong: rgba(255, 255, 255, 0.1);
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f8fbff;
+      --muted: rgba(226, 232, 240, 0.68);
+      --soft: rgba(226, 232, 240, 0.42);
+      --cyan: #55e6ff;
+      --blue: #5f8bff;
+      --violet: #b982ff;
+      --danger: #ff6b7a;
+      --ok: #58e6a4;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100svh;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% -10%, rgba(85, 230, 255, 0.22), transparent 34%),
+        radial-gradient(circle at 18% 80%, rgba(54, 211, 181, 0.12), transparent 32%),
+        radial-gradient(circle at 84% 70%, rgba(113, 91, 255, 0.18), transparent 34%),
+        linear-gradient(180deg, #07101a 0%, #050814 55%, #03050d 100%);
+    }
+
+    .grain {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      opacity: 0.12;
+      mix-blend-mode: overlay;
+      background-image:
+        radial-gradient(circle at 18% 22%, rgba(255,255,255,0.24) 0 1px, transparent 1.3px),
+        radial-gradient(circle at 76% 62%, rgba(255,255,255,0.16) 0 1px, transparent 1.4px);
+      background-size: 110px 110px, 160px 160px;
+    }
+
+    .connection {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: calc(var(--safe-top) + 22px) 20px calc(var(--safe-bottom) + 22px);
+      transition: opacity 260ms ease, transform 260ms ease;
+    }
+
+    .connection.hidden {
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.98);
+    }
+
+    .connect-card {
+      width: min(100%, 420px);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.105), rgba(255,255,255,0.035));
+      box-shadow:
+        0 26px 90px rgba(0, 0, 0, 0.55),
+        0 0 80px rgba(85, 230, 255, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.1);
+      backdrop-filter: blur(30px) saturate(165%);
+      -webkit-backdrop-filter: blur(30px) saturate(165%);
+      padding: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 0 38px rgba(85, 230, 255, 0.2);
+    }
+
+    .logo img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .label {
+      display: block;
+      margin: 0 0 8px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .input {
+      width: 100%;
+      min-height: 50px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      outline: none;
+      color: var(--text);
+      background: rgba(2, 6, 18, 0.52);
+      padding: 0 15px;
+      font-size: 16px;
+      user-select: text;
+      -webkit-user-select: text;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .input:focus {
+      border-color: rgba(85,230,255,0.55);
+      box-shadow: 0 0 0 4px rgba(85,230,255,0.12), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .hint {
+      margin-top: 9px;
+      color: var(--soft);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .buttons {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .button {
+      min-height: 50px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      color: var(--text);
+      background: rgba(255,255,255,0.07);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 750;
+      letter-spacing: 0;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .button:active {
+      transform: scale(0.985);
+    }
+
+    .button.primary {
+      border-color: rgba(85,230,255,0.38);
+      background:
+        linear-gradient(135deg, rgba(85,230,255,0.32), rgba(185,130,255,0.24)),
+        rgba(255,255,255,0.08);
+      box-shadow: 0 0 34px rgba(85,230,255,0.18);
+    }
+
+    .status {
+      display: none;
+      margin-top: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 12px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.055);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status.visible {
+      display: block;
+    }
+
+    .status.error {
+      color: #ffc4ca;
+      border-color: rgba(255,107,122,0.35);
+      background: rgba(255,107,122,0.1);
+    }
+
+    .status.ok {
+      color: #b9ffdc;
+      border-color: rgba(88,230,164,0.32);
+      background: rgba(88,230,164,0.09);
+    }
+
+    .recent {
+      display: none;
+      margin-top: 22px;
+    }
+
+    .recent.visible {
+      display: block;
+    }
+
+    .recent-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .recent-item {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      color: var(--text);
+      background: rgba(255,255,255,0.045);
+      padding: 12px 13px;
+      text-align: left;
+      overflow: hidden;
+    }
+
+    .recent-url {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .recent-meta {
+      margin-top: 3px;
+      color: var(--soft);
+      font-size: 12px;
+    }
+
+    .web-shell {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 260ms ease;
+      background: var(--bg);
+    }
+
+    .web-shell.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .native-fab {
+      position: absolute;
+      right: 16px;
+      bottom: calc(var(--safe-bottom) + 16px);
+      z-index: 25;
+      width: 46px;
+      height: 46px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 999px;
+      color: var(--text);
+      background: rgba(4, 8, 18, 0.9);
+      box-shadow: 0 18px 52px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.08);
+      display: grid;
+      place-items: center;
+      transition: transform 160ms ease, background 160ms ease, opacity 160ms ease;
+    }
+
+    .native-fab:active {
+      transform: scale(0.96);
+    }
+
+    .native-fab svg {
+      width: 19px;
+      height: 19px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dot {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--ok);
+      box-shadow: 0 0 18px rgba(88,230,164,0.6);
+      flex: none;
+    }
+
+    .dot.offline {
+      background: var(--danger);
+      box-shadow: 0 0 18px rgba(255,107,122,0.6);
+    }
+
+    .webview {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--bg);
+      color-scheme: dark;
+      overflow: auto;
+    }
+
+    .loading,
+    .offline {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: none;
+      place-items: center;
+      padding: 22px;
+      background:
+        radial-gradient(circle at 50% 25%, rgba(85,230,255,0.16), transparent 36%),
+        rgba(3,5,13,0.84);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .loading.visible,
+    .offline.visible {
+      display: grid;
+    }
+
+    .loader-card {
+      width: min(100%, 320px);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+      text-align: center;
+      background: rgba(255,255,255,0.06);
+      box-shadow: 0 24px 74px rgba(0,0,0,0.42);
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      margin: 0 auto 14px;
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 820ms linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .sheet {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      padding: 12px 14px calc(var(--safe-bottom) + 14px);
+      transform: translateY(110%);
+      transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    .sheet.visible {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .sheet-panel {
+      width: min(100%, 430px);
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 10px;
+      background: rgba(7, 10, 24, 0.86);
+      box-shadow: 0 30px 90px rgba(0,0,0,0.6);
+      backdrop-filter: blur(28px) saturate(170%);
+      -webkit-backdrop-filter: blur(28px) saturate(170%);
+    }
+
+    .sheet-title {
+      padding: 8px 10px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.35;
+    }
+
+    .sheet-title strong,
+    .sheet-title span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sheet-title strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .sheet-title span {
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .sheet-actions {
+      display: grid;
+      gap: 8px;
+    }
+
+    .sheet-action {
+      min-height: 48px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+      text-align: left;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 750;
+    }
+
+    .toast {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: calc(var(--safe-bottom) + 18px);
+      z-index: 80;
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px 14px;
+      background: rgba(7,10,24,0.88);
+      color: var(--text);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.44);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .toast.visible {
+      display: block;
+    }
+
+    .file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="grain"></div>
+
+    <section id="connection" class="connection">
+      <div class="connect-card">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">
+            <img src="./newcloud-icon.png" alt="">
+          </div>
+          <div>
+            <h1>NewCloud</h1>
+            <p class="subtitle">Connect to your private cloud on LAN.</p>
+          </div>
+        </div>
+
+        <label class="label" for="serverUrl">Server URL</label>
+        <input id="serverUrl" class="input" inputmode="url" autocomplete="url" spellcheck="false" placeholder="192.168.1.20:3000">
+        <p class="hint">Use your NewCloud web app address, for example http://192.168.x.x:3000 or http://newcloud.local.</p>
+
+        <div class="buttons">
+          <button id="connectBtn" class="button primary">Connect</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div id="recent" class="recent">
+          <span class="label">Recent servers</span>
+          <div id="recentList" class="recent-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="webShell" class="web-shell" aria-hidden="true">
+      <iframe
+        id="webview"
+        class="webview"
+        title="NewCloud web app"
+        scrolling="yes"
+        allow="autoplay *; camera *; microphone *; geolocation *; clipboard-read *; clipboard-write *; encrypted-media *; fullscreen *; picture-in-picture *"
+        sandbox="allow-downloads allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
+      ></iframe>
+
+      <button id="actionsBtn" class="native-fab" aria-label="Native actions">
+        <span id="networkDot" class="dot"></span>
+        <svg viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      </button>
+
+      <div id="loading" class="loading">
+        <div class="loader-card">
+          <div class="spinner"></div>
+          <strong>Loading NewCloud</strong>
+          <p class="subtitle" id="loadingText">Connecting to server...</p>
+        </div>
+      </div>
+
+      <div id="offline" class="offline">
+        <div class="loader-card">
+          <strong>Connection lost</strong>
+          <p class="subtitle">Check your Wi-Fi or make sure the NewCloud server is running.</p>
+          <div class="buttons">
+            <button id="retryBtn" class="button primary">Retry connection</button>
+            <button id="changeServerBtn" class="button">Change server</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="sheet" class="sheet" aria-hidden="true">
+      <div class="sheet-panel">
+        <div class="sheet-title">
+          <strong>NewCloud</strong>
+          <span id="serverLabel">Native mobile actions</span>
+        </div>
+        <div class="sheet-actions">
+          <button id="refreshBtn" class="sheet-action">Refresh <span>Reload app</span></button>
+          <button id="fileUploadBtn" class="sheet-action">Choose files <span>File picker</span></button>
+          <button id="cameraUploadBtn" class="sheet-action">Camera upload <span>Photo</span></button>
+          <button id="galleryUploadBtn" class="sheet-action">Gallery upload <span>Photo library</span></button>
+          <button id="notifyBtn" class="sheet-action">Enable notifications <span>Prepared</span></button>
+          <button id="shareBtn" class="sheet-action">Share server <span>Native share</span></button>
+          <button id="disconnectBtn" class="sheet-action">Change server <span>Reconnect</span></button>
+          <button id="closeSheetBtn" class="sheet-action">Close <span></span></button>
+        </div>
+      </div>
+    </div>
+
+    <input id="fileInput" class="file-input" type="file" multiple>
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="capacitor.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const Plugins = () => window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins : {};
+
+    const keys = {
+      server: "newcloud.mobile.server",
+      history: "newcloud.mobile.history"
+    };
+
+    const state = {
+      serverUrl: "",
+      online: true,
+      loadingTimer: 0
+    };
+
+    const connection = $("connection");
+    const webShell = $("webShell");
+    const webview = $("webview");
+    const serverUrl = $("serverUrl");
+    const connectBtn = $("connectBtn");
+    const status = $("status");
+    const recent = $("recent");
+    const recentList = $("recentList");
+    const loading = $("loading");
+    const loadingText = $("loadingText");
+    const offline = $("offline");
+    const networkDot = $("networkDot");
+    const serverLabel = $("serverLabel");
+    const refreshBtn = $("refreshBtn");
+    const disconnectBtn = $("disconnectBtn");
+    const retryBtn = $("retryBtn");
+    const changeServerBtn = $("changeServerBtn");
+    const actionsBtn = $("actionsBtn");
+    const sheet = $("sheet");
+    const closeSheetBtn = $("closeSheetBtn");
+    const fileInput = $("fileInput");
+    const fileUploadBtn = $("fileUploadBtn");
+    const cameraUploadBtn = $("cameraUploadBtn");
+    const galleryUploadBtn = $("galleryUploadBtn");
+    const shareBtn = $("shareBtn");
+    const notifyBtn = $("notifyBtn");
+    const toast = $("toast");
+
+    function plugin(name) {
+      return Plugins()[name];
+    }
+
+    async function prefGet(key) {
+      const Preferences = plugin("Preferences");
+      if (!Preferences) return localStorage.getItem(key);
+      const result = await Preferences.get({ key });
+      return result.value;
+    }
+
+    async function prefSet(key, value) {
+      const Preferences = plugin("Preferences");
+      if (!Preferences) return localStorage.setItem(key, value);
+      await Preferences.set({ key, value });
+    }
+
+    async function prefRemove(key) {
+      const Preferences = plugin("Preferences");
+      if (!Preferences) return localStorage.removeItem(key);
+      await Preferences.remove({ key });
+    }
+
+    function setStatus(message, type) {
+      status.textContent = message;
+      status.className = "status visible" + (type ? " " + type : "");
+    }
+
+    function clearStatus() {
+      status.className = "status";
+      status.textContent = "";
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("visible");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("visible"), 2600);
+    }
+
+    function normalizeUrl(input) {
+      let value = String(input || "").trim();
+      if (!value) return "";
+      if (/^(javascript|data|file):/i.test(value)) return "";
+      if (!/^https?:\/\//i.test(value)) value = "http://" + value;
+      const parsed = new URL(value);
+      parsed.hash = "";
+      return parsed.href.replace(/\/+$/, "");
+    }
+
+    function displayHost(url) {
+      try {
+        const parsed = new URL(url);
+        return parsed.host;
+      } catch {
+        return "NewCloud";
+      }
+    }
+
+    function targetOrigin() {
+      try {
+        return new URL(state.serverUrl).origin;
+      } catch {
+        return "*";
+      }
+    }
+
+    function withMobileParams(url, extras) {
+      const parsed = new URL(url);
+      parsed.searchParams.set("newcloudMobile", "1");
+      Object.entries(extras || {}).forEach(([key, value]) => {
+        parsed.searchParams.set(key, String(value));
+      });
+      return parsed.href;
+    }
+
+    function shouldUseFramedWebView() {
+      return new URLSearchParams(window.location.search).get("newcloudFrame") === "1";
+    }
+
+    async function verifyReachable(url) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        await fetch(url, { method: "GET", mode: "no-cors", cache: "no-store", signal: controller.signal });
+        clearTimeout(timeout);
+        return true;
+      } catch {
+        clearTimeout(timeout);
+        return false;
+      }
+    }
+
+    async function saveHistory(url) {
+      let history = [];
+      try {
+        history = JSON.parse((await prefGet(keys.history)) || "[]");
+      } catch {}
+      history = Array.isArray(history) ? history : [];
+      history = history.filter((item) => item.url !== url);
+      history.unshift({ url, at: Date.now() });
+      await prefSet(keys.history, JSON.stringify(history.slice(0, 5)));
+      renderHistory();
+    }
+
+    async function renderHistory() {
+      let history = [];
+      try {
+        history = JSON.parse((await prefGet(keys.history)) || "[]");
+      } catch {}
+      history = Array.isArray(history) ? history : [];
+      recentList.innerHTML = "";
+      recent.classList.toggle("visible", history.length > 0);
+      history.forEach((item) => {
+        const button = document.createElement("button");
+        button.className = "recent-item";
+        button.innerHTML = '<div class="recent-url">' + displayHost(item.url) + '</div><div class="recent-meta">' + item.url + '</div>';
+        button.addEventListener("click", () => connect(item.url));
+        recentList.appendChild(button);
+      });
+    }
+
+    async function connect(input) {
+      let url = "";
+      try {
+        url = normalizeUrl(input || serverUrl.value);
+      } catch {
+        setStatus("Enter a valid server URL.", "error");
+        return;
+      }
+      if (!url) {
+        setStatus("Enter a server address first.", "error");
+        return;
+      }
+
+      setStatus("Checking server...", "");
+      const reachable = await verifyReachable(url);
+      if (!reachable) {
+        setStatus("Could not reach that server. Check the address and Wi-Fi network.", "error");
+        return;
+      }
+
+      state.serverUrl = url;
+      await prefSet(keys.server, url);
+      await saveHistory(url);
+      openWebView(url);
+    }
+
+    function openWebView(url) {
+      clearStatus();
+      state.serverUrl = url;
+      serverLabel.textContent = displayHost(url);
+      loadingText.textContent = displayHost(url);
+
+      if (!shouldUseFramedWebView()) {
+        loading.classList.add("visible");
+        connection.classList.add("hidden");
+        window.location.replace(withMobileParams(url, { mobileTopLevel: "1" }));
+        return;
+      }
+
+      loading.classList.add("visible");
+      offline.classList.remove("visible");
+      connection.classList.add("hidden");
+      webShell.classList.add("visible");
+      webShell.setAttribute("aria-hidden", "false");
+      webview.src = withMobileParams(url);
+
+      clearTimeout(state.loadingTimer);
+      state.loadingTimer = setTimeout(() => {
+        loading.classList.remove("visible");
+        offline.classList.add("visible");
+      }, 12000);
+    }
+
+    function reloadWebView() {
+      if (!state.serverUrl) return;
+      toggleSheet(false);
+      loading.classList.add("visible");
+      offline.classList.remove("visible");
+      const currentSrc = webview.getAttribute("src") || state.serverUrl;
+      webview.src = withMobileParams(currentSrc, { mobileReload: Date.now() });
+    }
+
+    async function disconnect() {
+      toggleSheet(false);
+      webview.src = "about:blank";
+      webShell.classList.remove("visible");
+      webShell.setAttribute("aria-hidden", "true");
+      connection.classList.remove("hidden");
+      await prefRemove(keys.server);
+    }
+
+    function setOnline(isOnline) {
+      state.online = isOnline;
+      networkDot.classList.toggle("offline", !isOnline);
+      if (!isOnline && webShell.classList.contains("visible")) {
+        offline.classList.add("visible");
+      }
+    }
+
+    function toggleSheet(force) {
+      const next = typeof force === "boolean" ? force : !sheet.classList.contains("visible");
+      sheet.classList.toggle("visible", next);
+      sheet.setAttribute("aria-hidden", String(!next));
+    }
+
+    function filePayload(file) {
+      return {
+        name: file.name || "mobile-upload",
+        mimeType: file.type || "application/octet-stream",
+        file
+      };
+    }
+
+    async function sendFilesToWeb(files) {
+      if (!state.serverUrl || !webview.contentWindow) {
+        showToast("Connect to NewCloud first.");
+        return;
+      }
+      webview.contentWindow.postMessage({
+        source: "newcloud-mobile-shell",
+        type: "native-upload-files",
+        files
+      }, targetOrigin());
+      showToast("Sent to NewCloud upload queue.");
+      toggleSheet(false);
+    }
+
+    async function capturePhoto(source) {
+      const Camera = plugin("Camera");
+      if (!Camera) {
+        showToast("Camera plugin is unavailable in this build.");
+        return;
+      }
+
+      try {
+        const photo = await Camera.getPhoto({
+          quality: 88,
+          resultType: "dataUrl",
+          source,
+          saveToGallery: false,
+          allowEditing: false
+        });
+        if (!photo || !photo.dataUrl) return;
+        await sendFilesToWeb([{
+          name: "newcloud-" + Date.now() + ".jpg",
+          mimeType: "image/jpeg",
+          dataUrl: photo.dataUrl
+        }]);
+      } catch {
+        showToast("No photo selected.");
+      }
+    }
+
+    async function shareServer() {
+      const Share = plugin("Share");
+      if (!Share || !state.serverUrl) {
+        showToast(state.serverUrl || "Connect to a server first.");
+        return;
+      }
+      await Share.share({
+        title: "NewCloud",
+        text: "Open my NewCloud server",
+        url: state.serverUrl,
+        dialogTitle: "Share NewCloud server"
+      });
+      toggleSheet(false);
+    }
+
+    async function preparePushNotifications() {
+      const PushNotifications = plugin("PushNotifications");
+      if (!PushNotifications) {
+        showToast("Push notifications are not available in this build.");
+        return;
+      }
+      try {
+        const permission = await PushNotifications.requestPermissions();
+        if (permission.receive === "granted") {
+          showToast("Notifications are ready for future NewCloud alerts.");
+        } else {
+          showToast("Notifications were not enabled.");
+        }
+      } catch {
+        showToast("Notification permission failed.");
+      }
+      toggleSheet(false);
+    }
+
+    async function setupNative() {
+      const SplashScreen = plugin("SplashScreen");
+      const StatusBar = plugin("StatusBar");
+      const Keyboard = plugin("Keyboard");
+      const Network = plugin("Network");
+      const App = plugin("App");
+
+      if (SplashScreen) {
+        try { await SplashScreen.hide(); } catch {}
+      }
+      if (StatusBar) {
+        try { await StatusBar.setBackgroundColor({ color: "#03050d" }); } catch {}
+        try { await StatusBar.setStyle({ style: "DARK" }); } catch {}
+      }
+      if (Keyboard && Keyboard.setResizeMode) {
+        try { await Keyboard.setResizeMode({ mode: "body" }); } catch {}
+      }
+
+      if (Network) {
+        try {
+          const current = await Network.getStatus();
+          setOnline(current.connected);
+          Network.addListener("networkStatusChange", (status) => {
+            setOnline(status.connected);
+            if (status.connected) {
+              offline.classList.remove("visible");
+            }
+          });
+        } catch {}
+      }
+
+      if (App) {
+        try {
+          App.addListener("appUrlOpen", (event) => {
+            try {
+              const url = new URL(event.url);
+              const server = url.searchParams.get("server");
+              if (server) connect(server);
+            } catch {}
+          });
+        } catch {}
+      }
+    }
+
+    webview.addEventListener("load", () => {
+      clearTimeout(state.loadingTimer);
+      loading.classList.remove("visible");
+      offline.classList.remove("visible");
+    });
+
+    connectBtn.addEventListener("click", () => connect(serverUrl.value));
+    serverUrl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") connect(serverUrl.value);
+    });
+    refreshBtn.addEventListener("click", reloadWebView);
+    retryBtn.addEventListener("click", reloadWebView);
+    disconnectBtn.addEventListener("click", disconnect);
+    changeServerBtn.addEventListener("click", disconnect);
+    actionsBtn.addEventListener("click", () => toggleSheet());
+    closeSheetBtn.addEventListener("click", () => toggleSheet(false));
+    shareBtn.addEventListener("click", shareServer);
+    notifyBtn.addEventListener("click", preparePushNotifications);
+    cameraUploadBtn.addEventListener("click", () => capturePhoto("CAMERA"));
+    galleryUploadBtn.addEventListener("click", () => capturePhoto("PHOTOS"));
+    fileUploadBtn.addEventListener("click", () => fileInput.click());
+
+    fileInput.addEventListener("change", async () => {
+      const files = Array.from(fileInput.files || []);
+      fileInput.value = "";
+      if (files.length === 0) return;
+      const payloads = files.map(filePayload);
+      await sendFilesToWeb(payloads);
+    });
+
+    window.addEventListener("message", (event) => {
+      const message = event.data;
+      if (!message || message.source !== "newcloud-web") return;
+      if (message.type === "native-upload-accepted") showToast("Upload started in NewCloud.");
+      if (message.type === "native-upload-rejected") showToast("Sign in to NewCloud before uploading.");
+      if (message.type === "native-upload-failed") showToast("NewCloud could not import that file.");
+    });
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      await setupNative();
+      await renderHistory();
+      const saved = await prefGet(keys.server);
+      if (saved) {
+        serverUrl.value = saved.replace(/^https?:\/\//i, "");
+        const reachable = await verifyReachable(saved);
+        if (reachable) {
+          openWebView(saved);
+        } else {
+          setStatus("Saved server is not reachable. Check Wi-Fi or enter a new address.", "error");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
