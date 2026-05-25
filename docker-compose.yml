@@ -1,4 +1,4 @@
-name: newcloud
+name: ${COMPOSE_PROJECT_NAME:-newcloud}
 
 services:
   postgres:
@@ -143,6 +143,8 @@ services:
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}
       MAX_VERSIONS_PER_FILE: ${MAX_VERSIONS_PER_FILE:-10}
       TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
+      BULL_BOARD_USERNAME: ${BULL_BOARD_USERNAME:-admin}
+      BULL_BOARD_PASSWORD: ${BULL_BOARD_PASSWORD:?Run setup.sh/setup.bat first or set BULL_BOARD_PASSWORD}
     volumes:
       - ${NEWCLOUD_DATA_DIR:-./data}:/app/data
     networks:
@@ -163,13 +165,13 @@ services:
 
 volumes:
   postgres_data:
-    name: newcloud_postgres_data
+    name: ${COMPOSE_PROJECT_NAME:-newcloud}_postgres_data
   redis_data:
-    name: newcloud_redis_data
+    name: ${COMPOSE_PROJECT_NAME:-newcloud}_redis_data
 
 networks:
   web:
-    name: newcloud_web
+    name: ${COMPOSE_PROJECT_NAME:-newcloud}_web
   data:
-    name: newcloud_data
+    name: ${COMPOSE_PROJECT_NAME:-newcloud}_data
     internal: true

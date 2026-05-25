@@ -2,7 +2,7 @@
 set -eu
 
 REPOSITORY_URL="${NEWCLOUD_REPOSITORY_URL:-https://github.com/ShadowSafin/NewCloud.git}"
-INSTALL_DIR="${NEWCLOUD_INSTALL_DIR:-NewCloud}"
+INSTALL_DIR="${NEWCLOUD_INSTALL_DIR:-${HOME:?HOME is required unless NEWCLOUD_INSTALL_DIR is set}/NewCloud}"
 REPOSITORY_REF="${NEWCLOUD_REPOSITORY_REF:-main}"
 
 if [ -f "./setup.sh" ] && [ -f "./docker-compose.yml" ]; then

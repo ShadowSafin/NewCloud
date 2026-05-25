@@ -71,5 +71,5 @@ irm https://raw.githubusercontent.com/ShadowSafin/NewCloud/main/install.ps1 | ie
 | `frontend` | Next.js interface and same-origin API proxy | None |
 | `backend` | Express API, signed media streaming, health, WebSocket endpoint | `${NEWCLOUD_DATA_DIR:-./data}:/app/data` |
 | `worker` | Background uploads, thumbnail, and integrity workers | `${NEWCLOUD_DATA_DIR:-./data}:/app/data` |
-| `postgres` | Transactional metadata | `newcloud_postgres_data` |
-| `redis` | Queues and event transport | `newcloud_redis_data` |
+| `postgres` | Transactional metadata | `${COMPOSE_PROJECT_NAME}_postgres_data` |
+| `redis` | Queues and event transport | `${COMPOSE_PROJECT_NAME}_redis_data` |

@@ -83,6 +83,18 @@ function Assert-PortAvailable([string] $Port) {
     }
 }
 
+function Resolve-InitialPort([string] $EnvironmentKey, [string] $DefaultPort) {
+    $value = [Environment]::GetEnvironmentVariable($EnvironmentKey)
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $DefaultPort
+    }
+    $parsed = 0
+    if (-not [int]::TryParse($value, [ref]$parsed) -or $parsed -lt 1 -or $parsed -gt 65535) {
+        Throw-NewCloudError "$EnvironmentKey must be a port number from 1 through 65535."
+    }
+    return $value
+}
+
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Throw-NewCloudError "Docker is not installed. Install Docker Desktop and run setup again."
 }
@@ -98,16 +110,24 @@ if ($LASTEXITCODE -ne 0) {
 $lanIp = Find-LanIp
 $hostName = $env:COMPUTERNAME
 if (-not $hostName) { $hostName = "newcloud" }
+$composeProjectName = if ($env:NEWCLOUD_PROJECT_NAME) { $env:NEWCLOUD_PROJECT_NAME } else { "newcloud" }
+if ($composeProjectName -notmatch "^[a-z0-9][a-z0-9_-]*$") {
+    Throw-NewCloudError "NEWCLOUD_PROJECT_NAME may contain only lowercase letters, digits, underscores, and hyphens."
+}
+$initialFrontendPort = Resolve-InitialPort "NEWCLOUD_FRONTEND_PORT" "3000"
+$initialBackendPort = Resolve-InitialPort "NEWCLOUD_BACKEND_PORT" "4000"
+$initialDataDir = if ($env:NEWCLOUD_DATA_DIR) { $env:NEWCLOUD_DATA_DIR } else { "./data" }
 
 if (-not (Test-Path $EnvFile)) {
     $content = @"
 # Generated securely by setup.ps1. Back this file up separately from user data.
 NODE_ENV=production
-FRONTEND_PORT=3000
-BACKEND_PORT=4000
+COMPOSE_PROJECT_NAME=$composeProjectName
+FRONTEND_PORT=$initialFrontendPort
+BACKEND_PORT=$initialBackendPort
 FRONTEND_BIND_ADDRESS=0.0.0.0
 BACKEND_BIND_ADDRESS=0.0.0.0
-NEWCLOUD_DATA_DIR=./data
+NEWCLOUD_DATA_DIR=$initialDataDir
 
 DB_USER=newcloud
 DB_PASSWORD=$(New-SecureHex)
@@ -122,7 +142,7 @@ JWT_REFRESH_EXPIRATION=7d
 BULL_BOARD_USERNAME=admin
 BULL_BOARD_PASSWORD=$(New-SecureHex)
 
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:$initialFrontendPort
 CORS_ORIGINS=
 TRUST_PROXY=loopback, linklocal, uniquelocal
 HOST_LAN_IP=$lanIp

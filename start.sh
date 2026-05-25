@@ -48,6 +48,29 @@ wait_for_url() {
   fail "$label did not become healthy. Inspect logs with: docker compose logs $label"
 }
 
+wait_for_service_health() {
+  service="$1"
+  attempts=0
+  while [ "$attempts" -lt 60 ]; do
+    container_id=$(docker compose --env-file "$ENV_FILE" ps -q "$service" 2>/dev/null | head -n 1)
+    if [ -n "$container_id" ]; then
+      status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+      case "$status" in
+        healthy)
+          info "$service is healthy."
+          return 0
+          ;;
+        unhealthy|exited|dead)
+          fail "$service entered state '$status'. Inspect logs with: docker compose logs $service"
+          ;;
+      esac
+    fi
+    attempts=$((attempts + 1))
+    sleep 2
+  done
+  fail "$service did not become healthy. Inspect logs with: docker compose logs $service"
+}
+
 command -v docker >/dev/null 2>&1 || fail "Docker is not installed."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required."
 docker info >/dev/null 2>&1 || fail "The Docker engine is not running."
@@ -80,6 +103,7 @@ backend_port=$(get_env BACKEND_PORT)
 
 wait_for_url "backend" "http://127.0.0.1:${backend_port}/health/ready"
 wait_for_url "frontend" "http://127.0.0.1:${frontend_port}/health"
+wait_for_service_health "worker"
 
 info "NewCloud is ready at http://localhost:${frontend_port}"
 lan_ip=$(get_env HOST_LAN_IP)

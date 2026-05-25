@@ -75,6 +75,22 @@ check_port_if_available() {
 
 require_docker
 cd "$ROOT_DIR"
+compose_project_name="${NEWCLOUD_PROJECT_NAME:-newcloud}"
+case "$compose_project_name" in
+  *[!a-z0-9_-]*|""|[-_]*)
+    fail "NEWCLOUD_PROJECT_NAME may contain only lowercase letters, digits, underscores, and hyphens, and must begin with a letter or digit."
+    ;;
+esac
+initial_frontend_port="${NEWCLOUD_FRONTEND_PORT:-3000}"
+initial_backend_port="${NEWCLOUD_BACKEND_PORT:-4000}"
+initial_data_dir="${NEWCLOUD_DATA_DIR:-./data}"
+case "$initial_frontend_port:$initial_backend_port" in
+  *[!0-9:]*)
+    fail "NEWCLOUD_FRONTEND_PORT and NEWCLOUD_BACKEND_PORT must be numeric ports."
+    ;;
+esac
+[ "$initial_frontend_port" -ge 1 ] && [ "$initial_frontend_port" -le 65535 ] || fail "NEWCLOUD_FRONTEND_PORT must be from 1 through 65535."
+[ "$initial_backend_port" -ge 1 ] && [ "$initial_backend_port" -le 65535 ] || fail "NEWCLOUD_BACKEND_PORT must be from 1 through 65535."
 
 if [ ! -f "$ENV_FILE" ]; then
   lan_ip=$(detect_lan_ip || true)
@@ -83,11 +99,12 @@ if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<EOF
 # Generated securely by setup.sh. Back this file up separately from user data.
 NODE_ENV=production
-FRONTEND_PORT=3000
-BACKEND_PORT=4000
+COMPOSE_PROJECT_NAME=$compose_project_name
+FRONTEND_PORT=$initial_frontend_port
+BACKEND_PORT=$initial_backend_port
 FRONTEND_BIND_ADDRESS=0.0.0.0
 BACKEND_BIND_ADDRESS=0.0.0.0
-NEWCLOUD_DATA_DIR=./data
+NEWCLOUD_DATA_DIR=$initial_data_dir
 
 DB_USER=newcloud
 DB_PASSWORD=$(random_hex)
@@ -102,7 +119,7 @@ JWT_REFRESH_EXPIRATION=7d
 BULL_BOARD_USERNAME=admin
 BULL_BOARD_PASSWORD=$(random_hex)
 
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:$initial_frontend_port
 CORS_ORIGINS=
 TRUST_PROXY=loopback, linklocal, uniquelocal
 HOST_LAN_IP=$lan_ip
@@ -130,8 +147,12 @@ else
   generate_if_placeholder BULL_BOARD_PASSWORD
 fi
 
-mkdir -p "$ROOT_DIR/data/storage"
-chmod 700 "$ROOT_DIR/data" 2>/dev/null || true
+configured_data_dir=$(get_env NEWCLOUD_DATA_DIR)
+[ -n "$configured_data_dir" ] || configured_data_dir="./data"
+case "$configured_data_dir" in
+  /*) mkdir -p "$configured_data_dir/storage"; chmod 700 "$configured_data_dir" 2>/dev/null || true ;;
+  *) mkdir -p "$ROOT_DIR/$configured_data_dir/storage"; chmod 700 "$ROOT_DIR/$configured_data_dir" 2>/dev/null || true ;;
+esac
 
 if [ -z "$(docker compose --env-file "$ENV_FILE" ps -q 2>/dev/null)" ]; then
   frontend_port=$(get_env FRONTEND_PORT)

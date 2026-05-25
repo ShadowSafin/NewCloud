@@ -102,8 +102,8 @@ Docker Compose provisions five runtime services:
 | `frontend` | Node 22, Next standalone | `${FRONTEND_PORT}:3000` | None                     | Web application, frontend health endpoint, and `/api` reverse proxy.               |
 | `backend`  | Node 20, Express         | `${BACKEND_PORT}:4000`  | `${NEWCLOUD_DATA_DIR}`   | REST API, secure streaming, readiness checks, queue dashboard, mDNS, WebSockets.   |
 | `worker`   | Same backend image       | None                  | `${NEWCLOUD_DATA_DIR}`   | BullMQ consumers and scheduled integrity jobs; waits for healthy backend startup.  |
-| `postgres` | PostgreSQL 16 Alpine     | Not host-published    | `newcloud_postgres_data` | Transactional metadata; internal data network only.                                |
-| `redis`    | Redis 7 Alpine           | Not host-published    | `newcloud_redis_data`    | Queues and event transport; internal data network only.                            |
+| `postgres` | PostgreSQL 16 Alpine     | Not host-published    | `${COMPOSE_PROJECT_NAME}_postgres_data` | Transactional metadata; internal data network only.                  |
+| `redis`    | Redis 7 Alpine           | Not host-published    | `${COMPOSE_PROJECT_NAME}_redis_data`    | Queues and event transport; internal data network only.               |
 
 On backend container startup, Compose executes:
 

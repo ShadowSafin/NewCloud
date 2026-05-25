@@ -89,6 +89,29 @@ function Wait-Endpoint([string] $Label, [string] $Url) {
     Throw-NewCloudError "$Label did not become healthy. Inspect logs with: docker compose logs $Label"
 }
 
+function Wait-ServiceHealth([string] $Service) {
+    Push-Location $RootDir
+    try {
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            $containerId = docker compose --env-file $EnvFile ps -q $Service 2>$null | Select-Object -First 1
+            if ($containerId) {
+                $status = (docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" $containerId 2>$null).Trim()
+                if ($status -eq "healthy") {
+                    Write-NewCloudInfo "$Service is healthy."
+                    return
+                }
+                if ($status -eq "unhealthy" -or $status -eq "exited" -or $status -eq "dead") {
+                    Throw-NewCloudError "$Service entered state '$status'. Inspect logs with: docker compose logs $Service"
+                }
+            }
+            Start-Sleep -Seconds 2
+        }
+    } finally {
+        Pop-Location
+    }
+    Throw-NewCloudError "$Service did not become healthy. Inspect logs with: docker compose logs $Service"
+}
+
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Throw-NewCloudError "Docker is not installed."
 }
@@ -150,6 +173,7 @@ if (-not $backendPort) { $backendPort = "4000" }
 
 Wait-Endpoint "backend" "http://127.0.0.1:$backendPort/health/ready"
 Wait-Endpoint "frontend" "http://127.0.0.1:$frontendPort/health"
+Wait-ServiceHealth "worker"
 
 Write-NewCloudInfo "NewCloud is ready at http://localhost:$frontendPort"
 if ($lanIp) {
