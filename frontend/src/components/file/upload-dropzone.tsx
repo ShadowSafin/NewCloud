@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState } from "react";
 import { useUploadStore } from "@/store/uploadStore";
-import { useFileStore } from "@/store/fileStore";
 import { cn, formatFileSize } from "@/lib/utils";
 import { Upload, X, File } from "lucide-react";
 
@@ -13,22 +12,10 @@ interface UploadDropzoneProps {
 }
 
 export function UploadDropzone({ isOpen, onClose, folderId }: UploadDropzoneProps) {
-  const { addUpload, uploads } = useUploadStore();
-  const { fetchFiles, fetchFolders } = useFileStore();
+  const { addUpload } = useUploadStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const prevCompletedRef = useRef(0);
-
-  // Auto-refresh file list when uploads complete
-  useEffect(() => {
-    const completedCount = uploads.filter((u) => u.status === "completed").length;
-    if (completedCount > prevCompletedRef.current) {
-      fetchFiles(folderId || undefined);
-      fetchFolders(folderId || undefined);
-    }
-    prevCompletedRef.current = completedCount;
-  }, [uploads, fetchFiles, fetchFolders, folderId]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

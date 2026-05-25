@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, Suspense, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useFileStore, FileItem } from "@/store/fileStore";
@@ -200,7 +200,7 @@ function DashboardContent() {
     cut: clipboardCut,
   } = useClipboardStore();
   const { addToast } = useToastStore();
-  const { recoverUploads, addUpload } = useUploadStore();
+  const { recoverUploads, addUpload, uploads } = useUploadStore();
   const { menu: bgContextMenu, open: openBgContextMenu, close: closeBgContextMenu } = useContextMenu();
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -216,11 +216,15 @@ function DashboardContent() {
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string | null>(null);
+  const completedUploadIdsRef = useRef(new Set<string>());
 
   const isSpecialView = !!view;
   const isTrashView = view === "trash";
   const isRecentView = view === "recent";
   const isStarredView = view === "starred";
+  const displayedFolderId = store.currentFolderId;
+  const refreshFiles = store.fetchFiles;
+  const refreshFolders = store.fetchFolders;
 
   // Cancel stale uploads on page load
   useEffect(() => { recoverUploads(); }, [recoverUploads]);
@@ -320,6 +324,49 @@ function DashboardContent() {
       if (store.currentFolderId) store.fetchBreadcrumb(store.currentFolderId);
     }
   }, [isAuthenticated, authLoading, store.currentFolderId, view]);
+
+  // The visible drive view owns upload reconciliation so uploads from every
+  // entrypoint appear as soon as backend processing has completed.
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+
+    const completedUploads = uploads.filter((upload) => upload.status === "completed");
+    const newlyCompleted = completedUploads.filter(
+      (upload) => !completedUploadIdsRef.current.has(upload.id)
+    );
+
+    completedUploads.forEach((upload) => completedUploadIdsRef.current.add(upload.id));
+    if (newlyCompleted.length === 0) return;
+
+    if (isRecentView) {
+      setViewLoading(true);
+      filesApi.recent()
+        .then((response) => setViewFiles(response.data.data))
+        .catch(() => setViewFiles([]))
+        .finally(() => setViewLoading(false));
+      return;
+    }
+
+    if (!isSpecialView) {
+      const currentFolderHasUpload = newlyCompleted.some(
+        (upload) => (upload.folderId || null) === displayedFolderId
+      );
+
+      if (currentFolderHasUpload) {
+        refreshFiles(displayedFolderId);
+        refreshFolders(displayedFolderId);
+      }
+    }
+  }, [
+    uploads,
+    isAuthenticated,
+    authLoading,
+    isRecentView,
+    isSpecialView,
+    displayedFolderId,
+    refreshFiles,
+    refreshFolders,
+  ]);
 
   // Sort files
   const sortItems = <T extends { originalName?: string; name?: string; createdAt: string; size?: number; category?: string }>(
