@@ -85,6 +85,22 @@ On Windows, generate an installer with `npm run dist:windows`. On Linux, generat
 AppImage, DEB, and RPM artifacts with `npm run dist:linux`. Changes to data models must
 remain valid for the PostgreSQL Compose schema and the SQLite native staging transform.
 
+### Desktop Client Workflow
+
+The `desktop/` application is a Windows Electron wrapper for an already-running web
+deployment. It must not duplicate frontend pages or start backend services.
+
+```bash
+cd desktop
+npm install
+npm run build
+npm run dist:windows
+```
+
+Desktop changes should preserve the secure renderer boundary, restrict remote
+navigation to the configured server origin, and keep generated `.exe` artifacts out of
+source control. Installer output belongs in a GitHub Release.
+
 ## Codebase Guide
 
 | Path                           | Changes that belong here                                            |
@@ -98,6 +114,7 @@ remain valid for the PostgreSQL Compose schema and the SQLite native staging tra
 | `frontend/src/lib/`            | Central API and chunk-upload clients.                               |
 | `frontend/src/store/`          | Client-side auth, explorer, upload, clipboard, and toast state.     |
 | `frontend/src/components/`     | User-interface components and application surfaces.                 |
+| `desktop/`                     | Connected Electron wrapper, Windows installer, tray, and recovery UI. |
 
 ## Engineering Rules
 

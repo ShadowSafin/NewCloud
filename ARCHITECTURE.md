@@ -11,6 +11,7 @@ behavior, where an apparently small change can affect persisted files.
 - [Repository Layout](#repository-layout)
 - [Runtime Topology](#runtime-topology)
 - [Native Server Topology](#native-server-topology)
+- [Desktop Client Topology](#desktop-client-topology)
 - [Backend Modules](#backend-modules)
 - [Frontend Modules](#frontend-modules)
 - [Data Model](#data-model)
@@ -90,6 +91,10 @@ NexxCloud/
 |   |-- src/                    # tray, startup, runtime supervision, backups
 |   |-- scripts/                # native runtime staging
 |   `-- ui/                     # first-run/control panel
+|-- desktop/                    # Electron connected client for an existing server
+|   |-- src/                    # secure window, tray, connection/session management
+|   |-- installer/              # assisted Windows installer choices
+|   `-- ui/                     # connection, offline, and settings shell only
 |-- data/                       # bind-mounted application data
 |-- deploy/                     # HTTPS/proxy deployment examples
 |-- docker-compose.yml
@@ -164,6 +169,29 @@ SelectedDataDirectory/
 
 The native readiness probe performs a real application-table query, so a malformed or
 uninitialized SQLite file cannot be reported as a running server.
+
+## Desktop Client Topology
+
+The Windows desktop client is deliberately not another backend deployment and not a
+second frontend. It displays the existing hosted Next.js interface inside a secure
+Electron window after verifying that both the frontend and proxied backend health
+endpoints are reachable.
+
+```mermaid
+flowchart LR
+  Client["NexxCloud Desktop window"] -->|"Persistent secure browser session"| Web["Existing web interface"]
+  Web -->|"Same-origin /api"| API["Existing Docker or native server API"]
+  Shell["Local connection/settings shell"] -->|"Choose and verify URL"| Client
+  Tray["Windows tray and startup integration"] --> Client
+```
+
+| Desktop concern | Implementation |
+| --------------- | -------------- |
+| UI ownership | The loaded server owns all dashboard, login, file manager, and settings pages; local HTML exists only for connection recovery and desktop preferences. |
+| Connectivity | The client remembers local/LAN/HTTPS addresses, probes `/health` and `/api/health`, and returns to the previous remote route after recovery. |
+| Sessions | Electron uses a persistent isolated browser partition, preserving web login state across launches. |
+| Security | Remote renderers receive no trusted Node access; local IPC is denied unless invoked from the packaged local control screen; navigation is restricted to the configured origin. |
+| Windows behavior | Window bounds persistence, tray/minimize behavior, login startup toggle, deep-link preparation, updater preparation, and NSIS shortcuts. |
 
 ## Backend Modules
 
