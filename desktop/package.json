@@ -1,0 +1,86 @@
+{
+  "name": "nexxcloud-desktop",
+  "version": "1.0.0",
+  "description": "Secure desktop client for an existing NexxCloud server",
+  "main": "dist/main.js",
+  "author": "NexxCloud",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && electron .",
+    "dist:windows": "npm run build && electron-builder --win nsis --publish never",
+    "dist": "npm run dist:windows"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "io.nexxcloud.desktop",
+    "productName": "NexxCloud Desktop",
+    "executableName": "NexxCloud Desktop",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "node_modules/electron-log/**/*",
+      "node_modules/electron-updater/**/*",
+      "node_modules/builder-util-runtime/**/*",
+      "node_modules/lazy-val/**/*",
+      "node_modules/lodash.escaperegexp/**/*",
+      "node_modules/lodash.isequal/**/*",
+      "node_modules/semver/**/*",
+      "node_modules/fs-extra/**/*",
+      "node_modules/jsonfile/**/*",
+      "node_modules/universalify/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "ui",
+        "to": "ui"
+      },
+      {
+        "from": "../frontend/public/icon-512.png",
+        "to": "nexxcloud-icon.png"
+      }
+    ],
+    "protocols": [
+      {
+        "name": "NexxCloud Desktop Link",
+        "schemes": [
+          "nexxcloud"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../frontend/public/icon-512.png",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "runAfterFinish": false,
+      "include": "installer/installer.nsh",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ShadowSafin",
+        "repo": "NexxCloud"
+      }
+    ]
+  }
+}

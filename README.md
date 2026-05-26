@@ -21,6 +21,7 @@
     <img alt="Redis" src="https://img.shields.io/badge/Redis-BullMQ-DC382D?style=flat-square&logo=redis&logoColor=white">
     <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white">
     <img alt="Native Server" src="https://img.shields.io/badge/Native-Windows_%7C_Linux-7C5CFF?style=flat-square&logo=electron&logoColor=white">
+    <img alt="Desktop Client" src="https://img.shields.io/badge/Desktop-Windows_Client-20C7E5?style=flat-square&logo=electron&logoColor=white">
     <img alt="One Command Deploy" src="https://img.shields.io/badge/Deploy-one_command-15B8A6?style=flat-square">
   </p>
 </div>
@@ -130,6 +131,35 @@ Locally generated `.exe` installers are unsigned unless that certificate is supp
 
 ---
 
+## Windows Desktop Client
+
+`desktop/` is a lightweight Electron client for people who already have NexxCloud
+running through Docker, a native server install, or another machine on their LAN. It
+does not host services, embed database files, or copy the Next.js application; once
+connected, its window loads the existing web interface directly from the chosen server.
+
+| Desktop capability | Behavior |
+| ------------------ | -------- |
+| Server connection | Detects `http://localhost:3000`, accepts LAN or HTTPS URLs, saves recent servers, and reconnects after interruptions. |
+| Native window | Keeps persistent login sessions, restores bounds, supports fullscreen/maximize, and minimizes to a Windows tray icon. |
+| Safety boundary | Uses `contextIsolation`, sandboxed rendering, no Node.js in the web page, restricted origins, and local-only settings IPC. |
+| Windows install | NSIS installer offers desktop/start menu shortcuts, startup launch, launch-after-install, uninstall cleanup, and signing preparation. |
+
+### Build the Desktop Installer
+
+```powershell
+cd desktop
+npm install
+npm run dist:windows
+```
+
+The generated installer is written to `desktop/release/` and intentionally ignored by
+Git. Publish it as a GitHub Release artifact rather than committing executable binaries.
+The desktop window connects to an existing deployment at an address such as
+`http://localhost:3000`, `http://192.168.1.20:3000`, or an HTTPS reverse-proxy URL.
+
+---
+
 ## Overview
 
 NexxCloud is a LAN-friendly, self-hosted cloud storage application designed for people who
@@ -167,7 +197,7 @@ NexxCloud sits between a personal NAS and a modern hosted drive:
 | Sharing                   | Public share tokens support optional password protection and expiration.                                                                                                |
 | Previews                  | Images, video, audio, PDF, and selected text/code content render in the browser; thumbnail generation uses Sharp, FFmpeg, and Poppler.                                  |
 | Integrity maintenance     | Workers repair storage totals, reference counts, blob metadata, legacy attachment state, old chunks, trash retention, and unreferenced blobs.                           |
-| Deployment                | Docker Compose provisions isolated production services; native installers bundle the same UI/API with SQLite, local workers, tray controls, and startup integration.                     |
+| Deployment                | Docker Compose and native server packages host the platform; the Windows desktop client connects to either without duplicating the web interface.                                      |
 | Visual system             | Dark cinematic surfaces, glass treatments, cyan/violet accent lighting, Framer Motion landing transitions, and dense file-manager controls.                             |
 
 ## Screenshots
@@ -315,6 +345,7 @@ PostgreSQL and Redis services with health checks and persistent storage.
 | Docker Compose         | Run the GitHub one-liner above, or run `bash setup.sh` / `setup.bat` from an existing checkout.                                | First-class                    |
 | Windows Native Server  | Build or download the NSIS `.exe`; select a storage directory and run from the tray without Docker.                            | First-class native path        |
 | Linux Native Server    | Build or download `.AppImage`, `.deb`, or `.rpm`; enable login startup from the tray host.                                     | First-class native path        |
+| Windows Desktop Client | Install the WebView launcher and connect it to a running local, LAN, native, or Docker-hosted server.                           | First-class connected client   |
 | Portainer              | Create a Git Repository stack targeting `docker-compose.yml`; paste production variables generated from `.env.example`.       | Compose-compatible             |
 | Coolify                | Add a Docker Compose resource from GitHub, set required variables, and publish only the `frontend` service on port `3000`.     | Compose-compatible             |
 | Dockge                 | Clone locally, run setup once for `.env`, then manage the root Compose stack in Dockge.                                        | Compose-compatible             |
