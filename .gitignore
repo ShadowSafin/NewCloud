@@ -8,6 +8,8 @@ build/
 dist/
 .next/
 out/
+/desktop/release/
+/native/release/
 
 # The Capacitor wrapper uses a checked-in shell as its WebView entrypoint.
 !mobile/dist/
