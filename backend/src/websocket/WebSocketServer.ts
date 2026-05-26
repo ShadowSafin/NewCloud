@@ -44,7 +44,7 @@ export class AppWebSocketServer {
       console.error("[WebSocket] Server error:", error.message);
     });
 
-    if (!config.nativeRuntime) this.setupRedis();
+    this.setupRedis();
     this.startHeartbeat();
     this.isInitialized = true;
   }

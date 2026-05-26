@@ -1,6 +1,7 @@
-import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
+import { Worker } from "bullmq";
 import fs from "fs";
 import path from "path";
+import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
 import { storageService } from "../services/storageService";
 
@@ -33,8 +34,8 @@ async function cleanupTemporaryChunks(cutoff: Date): Promise<number> {
   return temporaryChunksDeleted;
 }
 
-export function createChunkCleanupWorker(): RuntimeWorker {
-  const worker = createRuntimeWorker(
+export function createChunkCleanupWorker(): Worker {
+  const worker = new Worker(
     "chunk-cleanup",
     async () => {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -73,7 +74,7 @@ export function createChunkCleanupWorker(): RuntimeWorker {
       }
       return { sessions: staleSessions.length, chunksDeleted, temporaryChunksDeleted };
     },
-    1
+    { connection: createRedisConnection(), concurrency: 1 }
   );
 
   worker.on("failed", (job, err) => {

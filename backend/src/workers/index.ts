@@ -1,4 +1,4 @@
-import { RuntimeWorker } from "../lib/runtimeQueue";
+import { Worker } from "bullmq";
 import {
   chunkCleanupQueue,
   metadataRepairQueue,
@@ -20,8 +20,8 @@ import { createReferenceVerificationWorker } from "./referenceVerificationWorker
 import { createChunkCleanupWorker } from "./chunkCleanupWorker";
 import { createMetadataRepairWorker } from "./metadataRepairWorker";
 
-export function startAllWorkers(): RuntimeWorker[] {
-  const workers: RuntimeWorker[] = [];
+export function startAllWorkers(): Worker[] {
+  const workers: Worker[] = [];
 
   // Thumbnail generation (existing)
   workers.push(createThumbnailWorker());
@@ -103,7 +103,7 @@ export function startAllWorkers(): RuntimeWorker[] {
   return workers;
 }
 
-export async function stopAllWorkers(workers: RuntimeWorker[]): Promise<void> {
+export async function stopAllWorkers(workers: Worker[]): Promise<void> {
   console.log("Stopping all workers...");
   await Promise.all(workers.map((w) => w.close()));
   console.log("All workers stopped");

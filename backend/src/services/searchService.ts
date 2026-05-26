@@ -1,6 +1,5 @@
 import { prisma } from "../db";
 import { cacheGet, cacheSet, getCacheClient } from "../lib/redis";
-import { config } from "../config";
 
 const CACHE_TTL = 300;
 const RECENT_SEARCHES_KEY_PREFIX = "search:recent:";
@@ -223,23 +222,16 @@ export class SearchService {
     }
 
     if (query) {
-      where.OR = config.nativeRuntime
-        ? [
-            { originalName: { contains: query } },
-            { extension: { contains: query } },
-            { category: { contains: query } },
-            { mimeType: { contains: query } },
-          ]
-        : [
-            { originalName: { contains: query, mode: "insensitive" } },
-            { extension: { contains: query, mode: "insensitive" } },
-            { category: { contains: query, mode: "insensitive" } },
-            { mimeType: { contains: query, mode: "insensitive" } },
-            { metadata: { path: ["name"], string_contains: query } },
-            { metadata: { path: ["title"], string_contains: query } },
-            { metadata: { path: ["description"], string_contains: query } },
-            { metadata: { path: ["tags"], array_contains: [query] } },
-          ];
+      where.OR = [
+        { originalName: { contains: query, mode: "insensitive" } },
+        { extension: { contains: query, mode: "insensitive" } },
+        { category: { contains: query, mode: "insensitive" } },
+        { mimeType: { contains: query, mode: "insensitive" } },
+        { metadata: { path: ["name"], string_contains: query } },
+        { metadata: { path: ["title"], string_contains: query } },
+        { metadata: { path: ["description"], string_contains: query } },
+        { metadata: { path: ["tags"], array_contains: [query] } },
+      ];
     }
 
     if (options.category) {
@@ -292,9 +284,7 @@ export class SearchService {
 
     if (query) {
       where.OR = [
-        config.nativeRuntime
-          ? { name: { contains: query } }
-          : { name: { contains: query, mode: "insensitive" } },
+        { name: { contains: query, mode: "insensitive" } },
       ];
     }
 
@@ -341,14 +331,6 @@ export class SearchService {
   }
 
   private mapToFileResult(file: any): FileSearchResult {
-    let metadata = file.metadata as Record<string, unknown> | null;
-    if (config.nativeRuntime && typeof file.metadata === "string") {
-      try {
-        metadata = JSON.parse(file.metadata) as Record<string, unknown>;
-      } catch {
-        metadata = null;
-      }
-    }
     return {
       id: file.id,
       originalName: file.originalName,
@@ -362,7 +344,7 @@ export class SearchService {
       createdAt: file.createdAt,
       updatedAt: file.updatedAt,
       folderId: file.folderId,
-      metadata,
+      metadata: file.metadata as Record<string, unknown> | null,
     };
   }
 

@@ -1,13 +1,13 @@
-import { Job } from "bullmq";
-import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
+import { Worker, Job } from "bullmq";
+import { createRedisConnection } from "../lib/redis";
 import { storageAccountingService } from "../services/storageAccountingService";
 
 interface StorageIntegrityJobData {
   userId?: string;
 }
 
-export function createStorageIntegrityWorker(): RuntimeWorker {
-  const worker = createRuntimeWorker(
+export function createStorageIntegrityWorker(): Worker {
+  const worker = new Worker(
     "storage-integrity",
     async (job: Job<StorageIntegrityJobData>) => {
       const repaired = await storageAccountingService.repairStorageIntegrity(job.data.userId);
@@ -20,7 +20,7 @@ export function createStorageIntegrityWorker(): RuntimeWorker {
       }
       return { repaired: repaired.length };
     },
-    1
+    { connection: createRedisConnection(), concurrency: 1 }
   );
 
   worker.on("failed", (job, err) => {

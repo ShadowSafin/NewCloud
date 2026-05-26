@@ -1,6 +1,6 @@
-import { Job } from "bullmq";
+import { Worker, Job } from "bullmq";
 import fs from "fs";
-import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
+import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
 import { config } from "../config";
 import { storageBlobService } from "../services/storageBlobService";
@@ -9,8 +9,8 @@ interface VersionCleanupJobData {
   fileId: string;
 }
 
-export function createVersionCleanupWorker(): RuntimeWorker {
-  const worker = createRuntimeWorker(
+export function createVersionCleanupWorker(): Worker {
+  const worker = new Worker(
     "version-cleanup",
     async (job: Job<VersionCleanupJobData>) => {
       const { fileId } = job.data;
@@ -50,7 +50,10 @@ export function createVersionCleanupWorker(): RuntimeWorker {
       console.log(`Cleaned up ${deletedCount} versions for file ${fileId}`);
       return { deleted: deletedCount, remaining: versions.length - deletedCount };
     },
-    2
+    {
+      connection: createRedisConnection(),
+      concurrency: 2,
+    }
   );
 
   worker.on("completed", (job) => {

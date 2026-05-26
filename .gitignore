@@ -65,15 +65,3 @@ prisma/migrations/*/migration_lock.toml
 /AGENTS.md
 /*.apk
 /*.aab
-
-# Native server installer output and staged application payload
-/native/node_modules/
-/native/dist/
-/native/runtime/
-/native/release/
-/frontend/tsconfig.tsbuildinfo
-
-# Desktop WebView client output
-/desktop/node_modules/
-/desktop/dist/
-/desktop/release/

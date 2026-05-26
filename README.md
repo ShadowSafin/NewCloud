@@ -20,8 +20,6 @@
     <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white">
     <img alt="Redis" src="https://img.shields.io/badge/Redis-BullMQ-DC382D?style=flat-square&logo=redis&logoColor=white">
     <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white">
-    <img alt="Native Server" src="https://img.shields.io/badge/Native-Windows_%7C_Linux-7C5CFF?style=flat-square&logo=electron&logoColor=white">
-    <img alt="Desktop Client" src="https://img.shields.io/badge/Desktop-Windows_Client-20C7E5?style=flat-square&logo=electron&logoColor=white">
     <img alt="One Command Deploy" src="https://img.shields.io/badge/Deploy-one_command-15B8A6?style=flat-square">
   </p>
 </div>
@@ -64,102 +62,6 @@ schema synchronization.
 
 ---
 
-## Native Server Installers (No Docker)
-
-NexxCloud also ships as a lightweight native server host alongside Docker. The native
-installer runs the existing web interface and API locally, adds a system tray control
-panel, and removes the requirement to install PostgreSQL or Redis.
-
-| Deployment choice | Data and processing | Best for |
-| ----------------- | ------------------- | -------- |
-| Docker Compose | PostgreSQL, Redis/BullMQ, five isolated services | NAS, VPS, container hosts, multi-service operations |
-| Native Server | Embedded SQLite, in-process workers/cache, bundled frontend/API | Windows or Linux home servers and beginner installs |
-
-### Installer Experience
-
-1. Install **NexxCloud Server** from a generated Windows `.exe`, Linux `.AppImage`,
-   `.deb`, or `.rpm` release artifact.
-2. Choose the data directory, such as `D:\NexxCloudData` or
-   `/mnt/storage/NexxCloudData`.
-3. Choose the browser port and leave **Start on login** enabled.
-4. The tray host initializes its local database, starts the API/workers/UI, and opens
-   the dashboard on `http://localhost:3000`.
-
-The native data directory is intentionally portable and backup-friendly:
-
-```text
-NexxCloudData/
-|-- uploads/        # incoming/user staging paths
-|-- blobs/          # content-addressed physical files
-|-- previews/       # derived previews
-|-- thumbnails/     # derived thumbnails
-|-- temp/           # reserved temporary work location
-|-- tmp/            # current backend scratch work
-|-- logs/           # backend/frontend/migration logs
-|-- database/       # SQLite database and applied migration ledger
-`-- backups/        # tray-created database/config snapshots
-```
-
-### Build Native Installers
-
-```powershell
-cd native
-npm install
-npm run dist:windows
-```
-
-```bash
-cd native
-npm install
-npm run dist:linux
-```
-
-Installer output is written to `native/release/`. Tagged GitHub builds use
-[`.github/workflows/native-release.yml`](./.github/workflows/native-release.yml) to
-publish Windows and Linux artifacts. Native storage uses the same blob and integrity
-logic as Docker; the runtime substitution is SQLite plus local workers rather than
-PostgreSQL plus Redis.
-
-The control window runs with Electron renderer isolation and navigation blocked outside
-its local setup UI. Dashboard navigation is opened through explicit tray commands in the
-system browser, while local secrets remain in the per-user native configuration file and
-its user-created backups.
-
-For signed Windows releases, configure the repository secrets `WINDOWS_CSC_LINK` and
-`WINDOWS_CSC_KEY_PASSWORD` with the code-signing certificate used by Electron Builder.
-Locally generated `.exe` installers are unsigned unless that certificate is supplied.
-
----
-
-## Windows Desktop Client
-
-`desktop/` is a lightweight Electron client for people who already have NexxCloud
-running through Docker, a native server install, or another machine on their LAN. It
-does not host services, embed database files, or copy the Next.js application; once
-connected, its window loads the existing web interface directly from the chosen server.
-
-| Desktop capability | Behavior |
-| ------------------ | -------- |
-| Server connection | Detects `http://localhost:3000`, accepts LAN or HTTPS URLs, saves recent servers, and reconnects after interruptions. |
-| Native window | Keeps persistent login sessions, restores bounds, supports fullscreen/maximize, and minimizes to a Windows tray icon. |
-| Safety boundary | Uses `contextIsolation`, sandboxed rendering, no Node.js in the web page, restricted origins, and local-only settings IPC. |
-| Windows install | NSIS installer offers desktop/start menu shortcuts, startup launch, launch-after-install, uninstall cleanup, and signing preparation. |
-
-### Build the Desktop Installer
-
-```powershell
-cd desktop
-npm install
-npm run dist:windows
-```
-
-The generated installer is written to `desktop/release/` and intentionally ignored by
-Git. Publish it as a GitHub Release artifact rather than committing executable binaries.
-The desktop window connects to an existing deployment at an address such as
-`http://localhost:3000`, `http://192.168.1.20:3000`, or an HTTPS reverse-proxy URL.
-
----
-
 ## Overview
 
 NexxCloud is a LAN-friendly, self-hosted cloud storage application designed for people who
@@ -177,8 +79,8 @@ NexxCloud sits between a personal NAS and a modern hosted drive:
 
 | Principle                  | What it means in NexxCloud                                                                                                   |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Self-hosted by default     | Choose a five-service Compose deployment or a native local server installer without surrendering file ownership.           |
-| Filesystem-first storage   | Original binary content lives under `STORAGE_ROOT`; metadata uses PostgreSQL in Docker or SQLite in native installs.       |
+| Self-hosted by default     | PostgreSQL, Redis, the API, workers, and the UI run in your Compose deployment.                                             |
+| Filesystem-first storage   | Original binary content lives under `STORAGE_ROOT`, with metadata in PostgreSQL.                                            |
 | LAN-first access           | The API exposes network status and mDNS publishes local service discovery names.                                            |
 | Integrity before expansion | Blob references, storage totals, stale chunks, and metadata are actively verified.                                          |
 | One polished web surface   | A glass-panel file manager, previews, upload queue, sharing, settings, and landing experience ship in the Next.js frontend. |
@@ -197,7 +99,7 @@ NexxCloud sits between a personal NAS and a modern hosted drive:
 | Sharing                   | Public share tokens support optional password protection and expiration.                                                                                                |
 | Previews                  | Images, video, audio, PDF, and selected text/code content render in the browser; thumbnail generation uses Sharp, FFmpeg, and Poppler.                                  |
 | Integrity maintenance     | Workers repair storage totals, reference counts, blob metadata, legacy attachment state, old chunks, trash retention, and unreferenced blobs.                           |
-| Deployment                | Docker Compose and native server packages host the platform; the Windows desktop client connects to either without duplicating the web interface.                                      |
+| Deployment                | Docker Compose provisions PostgreSQL 16, Redis 7, the Express API, the Next.js UI, and a dedicated worker process.                                                      |
 | Visual system             | Dark cinematic surfaces, glass treatments, cyan/violet accent lighting, Framer Motion landing transitions, and dense file-manager controls.                             |
 
 ## Screenshots
@@ -268,7 +170,6 @@ For internals, invariants, and data flows, see [ARCHITECTURE.md](./ARCHITECTURE.
 | Network discovery         | `bonjour-service` mDNS publication                          |
 | Testing and quality       | Vitest, ESLint, Prettier, strict TypeScript                 |
 | Containers                | Docker Compose, Node.js Alpine runtime images               |
-| Native distribution       | Electron host, SQLite, NSIS, AppImage, DEB, RPM            |
 
 ## Deployment Reference
 
@@ -343,9 +244,6 @@ PostgreSQL and Redis services with health checks and persistent storage.
 | Target                 | Deployment route                                                                                                               | Status                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
 | Docker Compose         | Run the GitHub one-liner above, or run `bash setup.sh` / `setup.bat` from an existing checkout.                                | First-class                    |
-| Windows Native Server  | Build or download the NSIS `.exe`; select a storage directory and run from the tray without Docker.                            | First-class native path        |
-| Linux Native Server    | Build or download `.AppImage`, `.deb`, or `.rpm`; enable login startup from the tray host.                                     | First-class native path        |
-| Windows Desktop Client | Install the WebView launcher and connect it to a running local, LAN, native, or Docker-hosted server.                           | First-class connected client   |
 | Portainer              | Create a Git Repository stack targeting `docker-compose.yml`; paste production variables generated from `.env.example`.       | Compose-compatible             |
 | Coolify                | Add a Docker Compose resource from GitHub, set required variables, and publish only the `frontend` service on port `3000`.     | Compose-compatible             |
 | Dockge                 | Clone locally, run setup once for `.env`, then manage the root Compose stack in Dockge.                                        | Compose-compatible             |
@@ -649,11 +547,6 @@ cd ../frontend
 npm run lint
 npm run typecheck
 npm run build
-
-cd ../native
-npm install
-npm run build:host
-npm run prepare:runtime
 ```
 
 The current Vitest suite covers binary signature validation and dangerous-type detection.
@@ -664,7 +557,7 @@ additions for contributors.
 
 | Status                 | Workstream                                                                                                                                                                  |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Implemented foundation | Content-addressed storage, reference counting, signed media, chunk merging, integrity workers, Compose migration startup, and native server runtime/packaging.                           |
+| Implemented foundation | Content-addressed storage, reference counting, signed media, chunk merging, integrity workers, Compose migration startup.                                                   |
 | Harden next            | Full API/storage integration test coverage, strict upload policy profiles, event emission wiring, hardened WebSocket authentication, share-password transport improvements. |
 | Evolve later           | Collaboration primitives, index/search exposure, richer activity views, and operational metrics.                                                                            |
 

@@ -32,8 +32,6 @@ import { wsServer } from "./websocket";
 import { mdnsService } from "./services/mdnsService";
 import networkRoutes from "./routes/networkRoutes";
 import { getCacheClient } from "./lib/redis";
-import { startAllWorkers, stopAllWorkers } from "./workers";
-import { RuntimeWorker, closeNativeQueueRuntime } from "./lib/runtimeQueue";
 
 const app = express();
 
@@ -185,7 +183,7 @@ app.get("/api/health", (_req: Request, res: Response) => {
 });
 
 app.get("/health/ready", asyncHandler(async (_req: Request, res: Response) => {
-  await prisma.user.count();
+  await prisma.$queryRaw`SELECT 1`;
   await getCacheClient().ping();
   const diskStats = await storageService.getDiskStats();
 
@@ -194,7 +192,7 @@ app.get("/health/ready", asyncHandler(async (_req: Request, res: Response) => {
     name: "NexxCloud",
     dependencies: {
       database: "ok",
-      queueTransport: config.nativeRuntime ? "in-process" : "redis",
+      redis: "ok",
       storage: diskStats.totalDisk > 0 ? "ok" : "unknown",
     },
   });
@@ -221,14 +219,12 @@ const bullBoardAuth = (req: Request, res: Response, next: NextFunction) => {
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
 
-if (!config.nativeRuntime) {
-  createBullBoard({
-    queues: allQueues.map((queue) => new BullMQAdapter(queue as any)),
-    serverAdapter,
-  });
+createBullBoard({
+  queues: allQueues.map((queue) => new BullMQAdapter(queue)),
+  serverAdapter,
+});
 
-  app.use("/admin/queues", bullBoardAuth, serverAdapter.getRouter());
-}
+app.use("/admin/queues", bullBoardAuth, serverAdapter.getRouter());
 
 // Direct /files routes remain for authenticated API clients.
 const fileService = new FileService(prisma);
@@ -262,17 +258,12 @@ app.use((_req: Request, res: Response) => {
 });
 
 let server: Server | null = null;
-let nativeWorkers: RuntimeWorker[] = [];
 
 async function initializeAndListen(): Promise<void> {
   try {
     await storageService.initialize();
     await prisma.$queryRaw`SELECT 1`;
     await getCacheClient().ping();
-    if (config.nativeRuntime) {
-      nativeWorkers = startAllWorkers();
-      console.log("Native runtime enabled: SQLite database and in-process workers active");
-    }
 
     try {
       await Promise.all([
@@ -309,10 +300,6 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`Received ${signal}. Starting graceful shutdown...`);
   mdnsService.stop();
   wsServer.disconnect();
-  if (config.nativeRuntime) {
-    await stopAllWorkers(nativeWorkers).catch(() => {});
-    await closeNativeQueueRuntime();
-  }
   if (!server) {
     await prisma.$disconnect();
     process.exit(0);

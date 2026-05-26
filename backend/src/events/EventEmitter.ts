@@ -23,7 +23,7 @@ export class CloudEventEmitter {
   constructor() {
     this.localEmitter = new EventEmitter();
     this.localEmitter.setMaxListeners(100);
-    if (!config.nativeRuntime) this.initRedis();
+    this.initRedis();
   }
 
   private async initRedis(): Promise<void> {

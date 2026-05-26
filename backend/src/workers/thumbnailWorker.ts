@@ -1,9 +1,9 @@
-import { Job } from "bullmq";
-import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
+import { Worker, Job } from "bullmq";
+import { createRedisConnection } from "../lib/redis";
 import { thumbnailService } from "../services/thumbnailService";
 
-export function createThumbnailWorker(): RuntimeWorker {
-  const worker = createRuntimeWorker(
+export function createThumbnailWorker(): Worker {
+  const worker = new Worker(
     "thumbnail-generation",
     async (job: Job) => {
       const { fileId } = job.data;
@@ -16,7 +16,10 @@ export function createThumbnailWorker(): RuntimeWorker {
         throw error;
       }
     },
-    3
+    {
+      connection: createRedisConnection(),
+      concurrency: 3,
+    }
   );
 
   worker.on("completed", (job) => {

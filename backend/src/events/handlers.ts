@@ -1,7 +1,5 @@
 import { prisma } from "../db";
 import { getCacheClient } from "../lib/redis";
-import { config } from "../config";
-import { wsServer } from "../websocket";
 import { CloudEventEmitter } from "./EventEmitter";
 import {
   CloudEventType,
@@ -84,7 +82,7 @@ async function logActivity(type: CloudEventType, data: EventPayload): Promise<vo
         fileId: fileId || null,
         folderId: folderId || null,
         action: type,
-        details: (config.nativeRuntime ? JSON.stringify(details) : details) as any,
+        details: details as any,
       },
     });
   } catch (err) {
@@ -105,9 +103,7 @@ async function sendNotification(type: CloudEventType, data: EventPayload): Promi
         type: notification.type,
         title: notification.title,
         message: notification.message,
-        data: notification.data
-          ? (config.nativeRuntime ? JSON.stringify(notification.data) : notification.data) as any
-          : undefined,
+        data: (notification.data as any) ?? undefined,
       },
     });
 
@@ -283,20 +279,6 @@ function getNotificationForEvent(
 
 function broadcastToWebSocket(type: CloudEventType, data: EventPayload): void {
   try {
-    if (config.nativeRuntime) {
-      const message = {
-        type: "sync_event" as const,
-        payload: { eventType: type, ...data },
-        timestamp: data.timestamp,
-      };
-      if (data.userId) {
-        wsServer.sendToUser(data.userId, message);
-      } else {
-        wsServer.broadcast(message);
-      }
-      return;
-    }
-
     const cacheClient = getCacheClient();
     const channel = data.userId
       ? `nexxcloud:ws:${data.userId}`

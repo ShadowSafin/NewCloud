@@ -1,5 +1,4 @@
 import { PrismaClient, File, Prisma } from "@prisma/client";
-import { config } from "../config";
 
 export class FileRepository {
   constructor(private prisma: PrismaClient) {}
@@ -87,9 +86,10 @@ export class FileRepository {
     }
 
     if (params.search) {
-      where.originalName = config.nativeRuntime
-        ? { contains: params.search }
-        : { contains: params.search, mode: "insensitive" };
+      where.originalName = {
+        contains: params.search,
+        mode: "insensitive",
+      };
     }
 
     if (params.category) {

@@ -1,8 +1,9 @@
-import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
+import { Worker } from "bullmq";
+import { createRedisConnection } from "../lib/redis";
 import { prisma } from "../db";
 
-export function createReferenceVerificationWorker(): RuntimeWorker {
-  const worker = createRuntimeWorker(
+export function createReferenceVerificationWorker(): Worker {
+  const worker = new Worker(
     "reference-verification",
     async () => {
       const blobs = await prisma.storageBlob.findMany({ select: { id: true, referenceCount: true } });
@@ -28,7 +29,7 @@ export function createReferenceVerificationWorker(): RuntimeWorker {
       }
       return { repaired };
     },
-    1
+    { connection: createRedisConnection(), concurrency: 1 }
   );
 
   worker.on("failed", (job, err) => {

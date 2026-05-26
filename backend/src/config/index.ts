@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
-const nativeRuntime = process.env.NEXXCLOUD_NATIVE_RUNTIME === "true";
 const weakValues = new Set([
   "",
   "default-secret-change-me",
@@ -24,7 +23,7 @@ const databaseUrl = process.env.DATABASE_URL || "";
 if (isProduction && !databaseUrl) {
   throw new Error("DATABASE_URL is required in production");
 }
-if (isProduction && !nativeRuntime) {
+if (isProduction) {
   requireProductionSecret("DB_PASSWORD", process.env.DB_PASSWORD || "");
 }
 
@@ -62,7 +61,6 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
   databaseUrl,
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
-  nativeRuntime,
   jwtSecret: requireProductionSecret("JWT_SECRET", process.env.JWT_SECRET || "default-secret-change-me"),
   jwtRefreshSecret: requireProductionSecret("JWT_REFRESH_SECRET", process.env.JWT_REFRESH_SECRET || "default-refresh-secret-change-me"),
   mediaTokenSecret: requireProductionSecret(

@@ -10,8 +10,6 @@ behavior, where an apparently small change can affect persisted files.
 - [System Context](#system-context)
 - [Repository Layout](#repository-layout)
 - [Runtime Topology](#runtime-topology)
-- [Native Server Topology](#native-server-topology)
-- [Desktop Client Topology](#desktop-client-topology)
 - [Backend Modules](#backend-modules)
 - [Frontend Modules](#frontend-modules)
 - [Data Model](#data-model)
@@ -29,8 +27,7 @@ behavior, where an apparently small change can affect persisted files.
 ## System Context
 
 NexxCloud is a self-hosted web application whose authoritative metadata is held in
-PostgreSQL for Docker deployments or SQLite for native server installations. Binary
-payloads are held in the same content-addressed filesystem store in both modes.
+PostgreSQL and whose binary payloads are held in a content-addressed filesystem store.
 The frontend never needs to know physical blob paths. It operates through authenticated
 REST operations and expiring media URLs.
 
@@ -87,14 +84,6 @@ NexxCloud/
 |       |-- hooks/
 |       |-- lib/
 |       `-- store/
-|-- native/                     # Electron server host and native packaging
-|   |-- src/                    # tray, startup, runtime supervision, backups
-|   |-- scripts/                # native runtime staging
-|   `-- ui/                     # first-run/control panel
-|-- desktop/                    # Electron connected client for an existing server
-|   |-- src/                    # secure window, tray, connection/session management
-|   |-- installer/              # assisted Windows installer choices
-|   `-- ui/                     # connection, offline, and settings shell only
 |-- data/                       # bind-mounted application data
 |-- deploy/                     # HTTPS/proxy deployment examples
 |-- docker-compose.yml
@@ -129,69 +118,6 @@ legacy NexxCloud core tables, then resumes normal
 `prisma migrate deploy` processing. Startup refuses weak production secrets, waits on
 PostgreSQL and Redis health, verifies writable storage, and exposes readiness at
 `/health/ready` only after dependencies respond.
-
-## Native Server Topology
-
-The native host exists beside Compose rather than replacing it. It bundles the production
-Next.js standalone server and compiled Express backend into an Electron tray application
-packaged through NSIS on Windows and AppImage, DEB, or RPM on Linux.
-
-```mermaid
-flowchart TB
-  Tray["Native tray host and setup window"] --> Web["Bundled Next.js server :3000"]
-  Tray --> API["Bundled Express API :4010"]
-  Web -->|"/api rewrite"| API
-  API --> DB[("SQLite in selected data directory")]
-  API --> Files["Content-addressed filesystem store"]
-  API --> Local["In-process queues, cache, and integrity workers"]
-  Tray --> Backup["Stopped-state SQLite/config backups"]
-```
-
-| Native concern | Implementation |
-| -------------- | -------------- |
-| First-run setup | Select data directory and UI port; cryptographic signing secrets are generated locally. |
-| Database | SQLite under `database/nexxcloud.db`; transactional SQL migrations are applied once through a local ledger. |
-| Background work | The existing workers run inside the API process through a local queue adapter, with no Redis dependency. |
-| Startup | Electron login startup integration launches a background tray process after sign-in. |
-| Control plane | Tray/menu window opens the dashboard, restarts or stops services, opens logs/data, toggles startup, and creates backups. |
-| Network | The frontend binds `0.0.0.0` for LAN access; the internal API remains proxied through the browser-facing UI. |
-
-Native installs maintain this local layout:
-
-```text
-SelectedDataDirectory/
-|-- uploads/ blobs/ previews/ thumbnails/ temp/ tmp/
-|-- logs/
-|-- database/nexxcloud.db
-|-- database/.migrations/
-`-- backups/
-```
-
-The native readiness probe performs a real application-table query, so a malformed or
-uninitialized SQLite file cannot be reported as a running server.
-
-## Desktop Client Topology
-
-The Windows desktop client is deliberately not another backend deployment and not a
-second frontend. It displays the existing hosted Next.js interface inside a secure
-Electron window after verifying that both the frontend and proxied backend health
-endpoints are reachable.
-
-```mermaid
-flowchart LR
-  Client["NexxCloud Desktop window"] -->|"Persistent secure browser session"| Web["Existing web interface"]
-  Web -->|"Same-origin /api"| API["Existing Docker or native server API"]
-  Shell["Local connection/settings shell"] -->|"Choose and verify URL"| Client
-  Tray["Windows tray and startup integration"] --> Client
-```
-
-| Desktop concern | Implementation |
-| --------------- | -------------- |
-| UI ownership | The loaded server owns all dashboard, login, file manager, and settings pages; local HTML exists only for connection recovery and desktop preferences. |
-| Connectivity | The client remembers local/LAN/HTTPS addresses, probes `/health` and `/api/health`, and returns to the previous remote route after recovery. |
-| Sessions | Electron uses a persistent isolated browser partition, preserving web login state across launches. |
-| Security | Remote renderers receive no trusted Node access; local IPC is denied unless invoked from the packaged local control screen; navigation is restricted to the configured origin. |
-| Windows behavior | Window bounds persistence, tray/minimize behavior, login startup toggle, deep-link preparation, updater preparation, and NSIS shortcuts. |
 
 ## Backend Modules
 
