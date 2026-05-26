@@ -1,0 +1,72 @@
+name: Native Server Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows NSIS
+            os: windows-latest
+            command: dist:windows
+            artifacts: |
+              native/release/*.exe
+              native/release/*.blockmap
+              native/release/latest.yml
+          - name: Linux Packages
+            os: ubuntu-22.04
+            command: dist:linux
+            artifacts: |
+              native/release/*.AppImage
+              native/release/*.deb
+              native/release/*.rpm
+              native/release/*.blockmap
+              native/release/latest-linux.yml
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            native/package-lock.json
+
+      - name: Install native packaging dependencies
+        working-directory: native
+        run: npm ci
+
+      - name: Build installer
+        working-directory: native
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: npm run ${{ matrix.command }} -- --publish never
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+
+      - name: Attach artifact to tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifacts }}

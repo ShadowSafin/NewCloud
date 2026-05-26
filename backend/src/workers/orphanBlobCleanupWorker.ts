@@ -1,10 +1,9 @@
-import { Worker } from "bullmq";
-import { createRedisConnection } from "../lib/redis";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { prisma } from "../db";
 import { storageBlobService } from "../services/storageBlobService";
 
-export function createOrphanBlobCleanupWorker(): Worker {
-  const worker = new Worker(
+export function createOrphanBlobCleanupWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "orphan-blob-cleanup",
     async () => {
       const blobs = await prisma.storageBlob.findMany({
@@ -29,7 +28,7 @@ export function createOrphanBlobCleanupWorker(): Worker {
       }
       return { deleted };
     },
-    { connection: createRedisConnection(), concurrency: 1 }
+    1
   );
 
   worker.on("failed", (job, err) => {

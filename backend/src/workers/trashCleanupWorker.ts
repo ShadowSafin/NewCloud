@@ -1,13 +1,13 @@
-import { Worker, Job } from "bullmq";
+import { Job } from "bullmq";
 import fs from "fs";
-import { createRedisConnection } from "../lib/redis";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { prisma } from "../db";
 import { config } from "../config";
 import { storageBlobService } from "../services/storageBlobService";
 import { storageAccountingService } from "../services/storageAccountingService";
 
-export function createTrashCleanupWorker(): Worker {
-  const worker = new Worker(
+export function createTrashCleanupWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "trash-cleanup",
     async (_job: Job) => {
       const retentionDays = config.trashRetentionDays;
@@ -77,10 +77,7 @@ export function createTrashCleanupWorker(): Worker {
       console.log(`Trash cleanup complete: ${deletedCount} files, ${expiredFolders.length} folders deleted`);
       return { deletedFiles: deletedCount, deletedFolders: expiredFolders.length };
     },
-    {
-      connection: createRedisConnection(),
-      concurrency: 1,
-    }
+    1
   );
 
   worker.on("completed", (job) => {

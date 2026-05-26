@@ -1,9 +1,9 @@
-import { Worker, Job } from "bullmq";
+import { Job } from "bullmq";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { File } from "@prisma/client";
-import { createRedisConnection } from "../lib/redis";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { thumbnailQueue } from "../lib/queues";
 import { prisma } from "../db";
 import { storageService } from "../services/storageService";
@@ -17,8 +17,8 @@ interface ChunkMergeJobData {
   userId: string;
 }
 
-export function createChunkMergeWorker(): Worker {
-  const worker = new Worker(
+export function createChunkMergeWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "chunk-merge",
     async (job: Job<ChunkMergeJobData>) => {
       const { sessionId, userId } = job.data;
@@ -183,10 +183,7 @@ export function createChunkMergeWorker(): Worker {
       console.log(`Session ${sessionId} merged successfully. File: ${mergedFileId}`);
       return { fileId: mergedFileId, hash: fileHash };
     },
-    {
-      connection: createRedisConnection(),
-      concurrency: 2,
-    }
+    2
   );
 
   worker.on("completed", (job) => {

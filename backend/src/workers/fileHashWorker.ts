@@ -1,7 +1,7 @@
-import { Worker, Job } from "bullmq";
+import { Job } from "bullmq";
 import fs from "fs";
 import crypto from "crypto";
-import { createRedisConnection } from "../lib/redis";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { dedupProcessorQueue } from "../lib/queues";
 import { prisma } from "../db";
 
@@ -9,8 +9,8 @@ interface FileHashJobData {
   fileId: string;
 }
 
-export function createFileHashWorker(): Worker {
-  const worker = new Worker(
+export function createFileHashWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "file-hash",
     async (job: Job<FileHashJobData>) => {
       const { fileId } = job.data;
@@ -43,10 +43,7 @@ export function createFileHashWorker(): Worker {
       console.log(`File ${fileId} hash: ${hash}`);
       return { fileId, hash };
     },
-    {
-      connection: createRedisConnection(),
-      concurrency: 3,
-    }
+    3
   );
 
   worker.on("completed", (job) => {

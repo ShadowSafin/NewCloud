@@ -1,10 +1,9 @@
-import { Worker } from "bullmq";
-import { createRedisConnection } from "../lib/redis";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { prisma } from "../db";
 import { dedupProcessorQueue, fileHashQueue } from "../lib/queues";
 
-export function createMetadataRepairWorker(): Worker {
-  const worker = new Worker(
+export function createMetadataRepairWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "metadata-repair",
     async () => {
       const files = await prisma.file.findMany({
@@ -50,7 +49,7 @@ export function createMetadataRepairWorker(): Worker {
 
       return { repaired, legacyQueued };
     },
-    { connection: createRedisConnection(), concurrency: 1 }
+    1
   );
 
   worker.on("failed", (job, err) => {
