@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPOSITORY_URL="${NEXXCLOUD_REPOSITORY_URL:-https://github.com/ShadowSafin/NewCloud.git}"
+REPOSITORY_URL="${NEXXCLOUD_REPOSITORY_URL:-https://github.com/ShadowSafin/NexxCloud.git}"
 INSTALL_DIR="${NEXXCLOUD_INSTALL_DIR:-${HOME:?HOME is required unless NEXXCLOUD_INSTALL_DIR is set}/NexxCloud}"
 REPOSITORY_REF="${NEXXCLOUD_REPOSITORY_REF:-main}"
 

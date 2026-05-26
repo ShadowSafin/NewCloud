@@ -2,7 +2,7 @@
 param()
 
 $ErrorActionPreference = "Stop"
-$RepositoryUrl = if ($env:NEXXCLOUD_REPOSITORY_URL) { $env:NEXXCLOUD_REPOSITORY_URL } else { "https://github.com/ShadowSafin/NewCloud.git" }
+$RepositoryUrl = if ($env:NEXXCLOUD_REPOSITORY_URL) { $env:NEXXCLOUD_REPOSITORY_URL } else { "https://github.com/ShadowSafin/NexxCloud.git" }
 $RepositoryRef = if ($env:NEXXCLOUD_REPOSITORY_REF) { $env:NEXXCLOUD_REPOSITORY_REF } else { "main" }
 
 function Write-NexxCloudInfo([string] $Message) {
