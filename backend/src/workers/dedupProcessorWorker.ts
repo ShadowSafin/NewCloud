@@ -1,7 +1,7 @@
-import { Worker, Job } from "bullmq";
+import { Job } from "bullmq";
 import fs from "fs";
 import path from "path";
-import { createRedisConnection } from "../lib/redis";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { prisma } from "../db";
 import { storageBlobService } from "../services/storageBlobService";
 import { storageService } from "../services/storageService";
@@ -11,8 +11,8 @@ interface DedupJobData {
   hash: string;
 }
 
-export function createDedupProcessorWorker(): Worker {
-  const worker = new Worker(
+export function createDedupProcessorWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "dedup-processor",
     async (job: Job<DedupJobData>) => {
       const { fileId, hash } = job.data;
@@ -57,10 +57,7 @@ export function createDedupProcessorWorker(): Worker {
       console.log(`File ${fileId} attached to blob ${blob.id}`);
       return { deduplicated: true, blobId: blob.id };
     },
-    {
-      connection: createRedisConnection(),
-      concurrency: 2,
-    }
+    2
   );
 
   worker.on("completed", (job) => {

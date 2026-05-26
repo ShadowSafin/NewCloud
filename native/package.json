@@ -1,0 +1,91 @@
+{
+  "name": "nexxcloud-native-server",
+  "version": "1.0.0",
+  "description": "NexxCloud native server host for Windows and Linux",
+  "main": "dist/main.js",
+  "author": "NexxCloud",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build:host": "tsc -p tsconfig.json",
+    "prepare:runtime": "node scripts/stage-runtime.mjs",
+    "dev": "npm run build:host && electron .",
+    "dist:windows": "npm run prepare:runtime && npm run build:host && electron-builder --win nsis",
+    "dist:linux": "npm run prepare:runtime && npm run build:host && electron-builder --linux AppImage deb rpm",
+    "dist": "npm run prepare:runtime && npm run build:host && electron-builder --win nsis --linux AppImage deb rpm"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "io.nexxcloud.server",
+    "productName": "NexxCloud Server",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "node_modules/electron-log/**/*",
+      "node_modules/electron-updater/**/*",
+      "node_modules/builder-util-runtime/**/*",
+      "node_modules/lazy-val/**/*",
+      "node_modules/lodash.escaperegexp/**/*",
+      "node_modules/lodash.isequal/**/*",
+      "node_modules/semver/**/*",
+      "node_modules/fs-extra/**/*",
+      "node_modules/jsonfile/**/*",
+      "node_modules/universalify/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "ui",
+        "to": "ui"
+      },
+      {
+        "from": "runtime",
+        "to": "runtime"
+      },
+      {
+        "from": "../frontend/public/icon-512.png",
+        "to": "nexxcloud-icon.png"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../frontend/public/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Network",
+      "icon": "../frontend/public/icon-512.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ShadowSafin",
+        "repo": "NexxCloud"
+      }
+    ]
+  }
+}

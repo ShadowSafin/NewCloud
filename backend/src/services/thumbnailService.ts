@@ -3,13 +3,11 @@ import path from "path";
 import fs from "fs";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import { storageService } from "./storageService";
 import { prisma } from "../db";
 
 const execFileAsync = promisify(execFile);
-ffmpeg.setFfmpegPath(ffmpegPath.path);
 
 const THUMBNAIL_SIZES = {
   small: 128,
@@ -63,20 +61,23 @@ class ThumbnailService {
     thumbnailPath: string,
     dim: number
   ): Promise<string | null> {
-    return new Promise((resolve) => {
-      ffmpeg(filePath)
-        .screenshots({
-          timestamps: [1],
-          filename: path.basename(thumbnailPath),
-          folder: path.dirname(thumbnailPath),
-          size: `${dim}x${dim}`,
-        })
-        .on("end", () => resolve(thumbnailPath))
-        .on("error", (err) => {
-          console.error("Video thumbnail error:", err.message);
-          resolve(null);
-        });
-    });
+    try {
+      await execFileAsync(ffmpegPath.path, [
+        "-hide_banner",
+        "-loglevel", "error",
+        "-ss", "1",
+        "-i", filePath,
+        "-frames:v", "1",
+        "-vf", `scale=${dim}:${dim}:force_original_aspect_ratio=increase,crop=${dim}:${dim}`,
+        "-q:v", "3",
+        "-y",
+        thumbnailPath,
+      ]);
+      return thumbnailPath;
+    } catch (err) {
+      console.error("Video thumbnail error:", err);
+      return null;
+    }
   }
 
   private async generatePdfThumbnail(

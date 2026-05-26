@@ -68,6 +68,23 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Native Server Workflow
+
+The `native/` application packages the existing compiled backend and standalone frontend;
+it is not an alternate UI. Native mode uses SQLite and local worker transport so it can
+run without Docker, PostgreSQL, or Redis.
+
+```bash
+cd native
+npm install
+npm run build:host
+npm run prepare:runtime
+```
+
+On Windows, generate an installer with `npm run dist:windows`. On Linux, generate
+AppImage, DEB, and RPM artifacts with `npm run dist:linux`. Changes to data models must
+remain valid for the PostgreSQL Compose schema and the SQLite native staging transform.
+
 ## Codebase Guide
 
 | Path                           | Changes that belong here                                            |
