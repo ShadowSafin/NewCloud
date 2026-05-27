@@ -1,23 +1,15 @@
-import Image from "next/image";
 import GithubIcon from "./GithubIcon";
 import ScrollTopButton from "./ScrollTopButton";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/5 bg-zinc-950/40 py-12 px-6 md:px-12 relative z-10">
+    <footer className="defer-render border-t border-white/5 bg-zinc-950/40 py-12 px-6 md:px-12 relative z-10">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
         
         {/* Branding & Logo */}
         <div className="flex items-center gap-2 font-semibold">
           <div className="w-6 h-6 overflow-hidden rounded-md border border-white/10">
-            <Image
-              src="/nexxcloud-mark.png"
-              alt=""
-              aria-hidden="true"
-              width={1024}
-              height={1024}
-              className="h-full w-full object-cover"
-            />
+            <span aria-hidden="true" className="block h-full w-full bg-[url('/icon.png')] bg-cover" />
           </div>
           <span className="text-[13px] tracking-tight">
             Nexx<span className="text-zinc-400 font-normal">Cloud</span>

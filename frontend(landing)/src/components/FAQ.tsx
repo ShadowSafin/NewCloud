@@ -1,11 +1,6 @@
-"use client";
-
-import { useState } from "react";
 import { ChevronDown, HelpCircle } from "lucide-react";
 
 export default function FAQ() {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-
   const faqs = [
     {
       question: "Is NexxCloud completely self-hosted?",
@@ -33,12 +28,8 @@ export default function FAQ() {
     },
   ];
 
-  const toggleAccordion = (index: number) => {
-    setActiveIndex(activeIndex === index ? null : index);
-  };
-
   return (
-    <section id="faq" className="py-24 md:py-32 px-6 md:px-12 bg-zinc-950/20 relative z-10">
+    <section id="faq" className="defer-render py-24 md:py-32 px-6 md:px-12 bg-zinc-950/20 relative z-10">
       <div className="max-w-3xl mx-auto">
         
         {/* Header Block */}
@@ -57,44 +48,33 @@ export default function FAQ() {
         {/* Custom Accordion Grid */}
         <div className="flex flex-col gap-4">
           {faqs.map((faq, idx) => {
-            const isOpen = activeIndex === idx;
             return (
-              <div
+              <details
                 key={faq.question}
-                className="rounded-2xl border border-white/5 bg-zinc-900/10 hover:bg-zinc-900/20 transition-all duration-300 overflow-hidden"
+                className="group rounded-2xl border border-white/5 bg-zinc-900/10 hover:bg-zinc-900/20 transition-all duration-300 overflow-hidden"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleAccordion(idx)}
-                  className="w-full flex items-center justify-between p-6 text-left text-[14px] md:text-[15px] font-semibold text-zinc-200 hover:text-foreground transition-colors group cursor-pointer"
-                  aria-expanded={isOpen}
-                  aria-controls={`faq-panel-${idx}`}
-                  id={`btn-faq-toggle-${idx}`}
+                <summary
+                  className="flex cursor-pointer list-none items-center justify-between p-6 text-left text-[14px] font-semibold text-zinc-200 hover:text-foreground transition-colors md:text-[15px] [&::-webkit-details-marker]:hidden"
                 >
                   <div className="flex items-center gap-3 pr-4">
                     <HelpCircle className="w-4 h-4 text-zinc-500 shrink-0 group-hover:text-brand-cyan transition-colors" />
                     <span className="tracking-tight leading-tight">{faq.question}</span>
                   </div>
                   <ChevronDown
-                    className={`w-4 h-4 text-zinc-500 shrink-0 transition-transform duration-500 ${
-                      isOpen ? "rotate-180 text-brand-cyan" : ""
-                    }`}
+                    className="w-4 h-4 shrink-0 text-zinc-500 transition-transform duration-500 group-open:rotate-180 group-open:text-brand-cyan"
                   />
-                </button>
+                </summary>
 
                 {/* Collapsible Content */}
                 <div
                   id={`faq-panel-${idx}`}
-                  role="region"
-                  aria-labelledby={`btn-faq-toggle-${idx}`}
-                  hidden={!isOpen}
                   className="border-t border-white/5"
                 >
                   <p className="p-6 text-[13px] leading-relaxed text-zinc-400 font-medium tracking-tight">
                     {faq.answer}
                   </p>
                 </div>
-              </div>
+              </details>
             );
           })}
         </div>

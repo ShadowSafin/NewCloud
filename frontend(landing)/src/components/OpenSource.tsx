@@ -3,7 +3,7 @@ import GithubIcon from "./GithubIcon";
 
 export default function OpenSource() {
   return (
-    <section className="py-24 md:py-32 px-6 md:px-12 bg-zinc-950/20 relative z-10">
+    <section className="defer-render py-24 md:py-32 px-6 md:px-12 bg-zinc-950/20 relative z-10">
       <div className="max-w-4xl mx-auto rounded-2xl border border-white/5 bg-zinc-900/10 p-8 md:p-12 relative overflow-hidden group">
         {/* Ambient background shading */}
         <div className="absolute inset-0 bg-radial-bg opacity-20 pointer-events-none" />

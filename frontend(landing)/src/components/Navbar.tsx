@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { ArrowUpRight, Menu, X } from "lucide-react";
 import GithubIcon from "./GithubIcon";
+import { GlassEffect, GlassFilter } from "./ui/liquid-glass";
 
 const navLinks = [
   { name: "Features", href: "#features" },
@@ -77,31 +77,29 @@ export default function Navbar() {
 
   return (
     <>
+      <GlassFilter />
       <nav
         aria-label="Primary"
         id="navbar"
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out ${
           scrolled
-            ? "py-3 px-4 md:px-8 mt-2 max-w-7xl mx-auto rounded-full glass border border-white/5 shadow-2xl scale-[0.98] w-[95%]"
-            : "py-6 px-6 md:px-12 w-full bg-transparent border-b border-transparent"
+            ? "mt-2 max-w-7xl mx-auto scale-[0.98] w-[95%]"
+            : "w-full"
         }`}
       >
-        <div className="flex items-center justify-between">
+        <GlassEffect
+          enabled={scrolled}
+          className={scrolled ? "rounded-full border border-white/10" : ""}
+          contentClassName={scrolled ? "py-3 px-4 md:px-8" : "py-6 px-6 md:px-12"}
+        >
+          <div className="flex items-center justify-between">
           <a
             href="#"
             className="flex items-center gap-2 group text-foreground font-semibold text-lg tracking-tight transition-opacity"
             id="nav-logo"
           >
             <div className="w-8 h-8 overflow-hidden rounded-lg border border-white/10 shadow-lg shadow-brand-purple/10 group-hover:scale-105 transition-transform duration-300">
-              <Image
-                src="/nexxcloud-mark.png"
-                alt=""
-                aria-hidden="true"
-                width={1024}
-                height={1024}
-                className="h-full w-full object-cover"
-                priority
-              />
+              <span aria-hidden="true" className="block h-full w-full bg-[url('/icon.png')] bg-cover" />
             </div>
             <span className="font-medium tracking-tight">
               Nexx<span className="text-zinc-400 font-normal">Cloud</span>
@@ -157,7 +155,8 @@ export default function Navbar() {
           >
             <Menu className="w-5 h-5" />
           </button>
-        </div>
+          </div>
+        </GlassEffect>
       </nav>
 
       {mobileMenuOpen && (
@@ -174,14 +173,7 @@ export default function Navbar() {
               <div className="flex items-center justify-between pb-6 border-b border-white/5">
                 <a href="#" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                   <div className="w-8 h-8 overflow-hidden rounded-lg border border-white/10">
-                    <Image
-                      src="/nexxcloud-mark.png"
-                      alt=""
-                      aria-hidden="true"
-                      width={1024}
-                      height={1024}
-                      className="h-full w-full object-cover"
-                    />
+                    <span aria-hidden="true" className="block h-full w-full bg-[url('/icon.png')] bg-cover" />
                   </div>
                   <span className="font-semibold text-lg">
                     Nexx<span className="text-zinc-400 font-normal">Cloud</span>

@@ -69,7 +69,7 @@ export default function Features() {
   ];
 
   return (
-    <section id="features" className="py-24 md:py-32 px-6 md:px-12 bg-zinc-950/20 relative z-10">
+    <section id="features" className="defer-render py-24 md:py-32 px-6 md:px-12 bg-zinc-950/20 relative z-10">
       <div className="max-w-6xl mx-auto">
         {/* Header Block */}
         <div className="text-center mb-20">

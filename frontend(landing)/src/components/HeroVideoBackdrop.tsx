@@ -1,43 +1,77 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
+
+type ConnectionNavigator = Navigator & {
+  connection?: {
+    saveData?: boolean;
+  };
+};
 
 export default function HeroVideoBackdrop() {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [canPlayVideo, setCanPlayVideo] = useState(false);
 
   useEffect(() => {
-    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const video = videoRef.current;
-    if (!video) {
-      return;
-    }
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const desktopViewport = window.matchMedia("(min-width: 768px)");
+    const saveData = (navigator as ConnectionNavigator).connection?.saveData;
+    let timeoutId: number | undefined;
+    let idleId: number | undefined;
 
-    const syncPlayback = () => {
-      if (preference.matches) {
-        video.pause();
-        video.currentTime = 0;
-      } else {
-        void video.play().catch(() => {
-          // Autoplay may be blocked until user interaction.
-        });
+    const cancelScheduledLoad = () => {
+      window.clearTimeout(timeoutId);
+      if (idleId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
       }
     };
 
-    syncPlayback();
-    preference.addEventListener("change", syncPlayback);
-    return () => preference.removeEventListener("change", syncPlayback);
+    const scheduleVideo = () => {
+      cancelScheduledLoad();
+      if (reducedMotion.matches || !desktopViewport.matches || saveData) {
+        setCanPlayVideo(false);
+        return;
+      }
+
+      timeoutId = window.setTimeout(() => {
+        if ("requestIdleCallback" in window) {
+          idleId = window.requestIdleCallback(() => setCanPlayVideo(true), {
+            timeout: 1500,
+          });
+        } else {
+          setCanPlayVideo(true);
+        }
+      }, 2500);
+    };
+
+    scheduleVideo();
+    reducedMotion.addEventListener("change", scheduleVideo);
+    desktopViewport.addEventListener("change", scheduleVideo);
+
+    return () => {
+      cancelScheduledLoad();
+      reducedMotion.removeEventListener("change", scheduleVideo);
+      desktopViewport.removeEventListener("change", scheduleVideo);
+    };
   }, []);
+
+  if (!canPlayVideo) {
+    return (
+      <div
+        aria-hidden="true"
+        className="hero-video-fallback absolute inset-0 h-full w-full"
+      />
+    );
+  }
 
   return (
     <video
-      ref={videoRef}
       aria-hidden="true"
       className="hero-video-layer absolute inset-0 h-full w-full object-cover object-center"
       autoPlay
       muted
       loop
       playsInline
-      preload="metadata"
+      preload="none"
       tabIndex={-1}
     >
       <source src="/hero-video.mp4" type="video/mp4" />

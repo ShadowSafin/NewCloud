@@ -1,19 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { repositoryUrl, siteConfig, siteUrl } from "@/lib/site";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -76,7 +65,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans h-full bg-[#030303] text-[#F4F4F5] antialiased selection:bg-brand-cyan/20 selection:text-brand-cyan`}
+        className="font-sans h-full bg-[#030303] text-[#F4F4F5] antialiased selection:bg-brand-cyan/20 selection:text-brand-cyan"
       >
         {children}
         <Analytics />

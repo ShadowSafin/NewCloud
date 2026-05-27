@@ -1,13 +1,8 @@
-"use client";
-
-import { useMemo, useState } from "react";
 import {
   FileText,
   Film,
   Folder,
-  Grid,
   HardDrive,
-  List,
   Music,
   Search,
   Share2,
@@ -50,16 +45,6 @@ const previewFiles = [
 ];
 
 export default function DashboardMockup() {
-  const [query, setQuery] = useState("");
-  const [view, setView] = useState<"list" | "grid">("list");
-  const [selectedName, setSelectedName] = useState(previewFiles[0].name);
-
-  const visibleFiles = useMemo(
-    () => previewFiles.filter((file) => file.name.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
-  const selectedFile = previewFiles.find((file) => file.name === selectedName);
-
   return (
     <div
       id="dashboard-preview"
@@ -115,10 +100,10 @@ export default function DashboardMockup() {
                 <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-zinc-500" />
                 <input
                   id="dashboard-search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search files"
-                  className="w-36 rounded-lg border border-white/10 bg-white/5 py-1.5 pl-8 pr-2 text-xs text-zinc-300 outline-none focus:border-brand-cyan/40 sm:w-44"
+                  readOnly
+                  tabIndex={-1}
+                  className="w-36 rounded-lg border border-white/10 bg-white/5 py-1.5 pl-8 pr-2 text-xs text-zinc-300 outline-none sm:w-44"
                 />
               </div>
               <button
@@ -133,41 +118,20 @@ export default function DashboardMockup() {
             </div>
           </div>
 
-          <div className="mb-3 flex items-center justify-end gap-1" aria-label="Preview layout">
-            <button
-              type="button"
-              onClick={() => setView("list")}
-              aria-label="List view"
-              aria-pressed={view === "list"}
-              className={`rounded-md p-1.5 ${view === "list" ? "bg-white/10 text-zinc-100" : "text-zinc-500"}`}
-            >
-              <List className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("grid")}
-              aria-label="Grid view"
-              aria-pressed={view === "grid"}
-              className={`rounded-md p-1.5 ${view === "grid" ? "bg-white/10 text-zinc-100" : "text-zinc-500"}`}
-            >
-              <Grid className="h-3.5 w-3.5" />
-            </button>
+          <div className="mb-3 flex items-center justify-end gap-1 text-[10px] font-mono text-zinc-500">
+            Preview
           </div>
 
-          {view === "list" ? (
-            <div className="space-y-1">
-              {visibleFiles.map((file) => {
+          <div className="space-y-1">
+              {previewFiles.map((file, index) => {
                 const Icon = file.icon;
                 return (
-                  <button
+                  <div
                     key={file.name}
-                    type="button"
-                    onClick={() => setSelectedName(file.name)}
-                    aria-pressed={selectedName === file.name}
                     className={`grid w-full grid-cols-[1fr_auto] items-center rounded-lg border px-3 py-2.5 text-left transition-colors sm:grid-cols-[1fr_90px_100px] ${
-                      selectedName === file.name
+                      index === 0
                         ? "border-white/10 bg-white/5"
-                        : "border-transparent text-zinc-400 hover:bg-white/5"
+                        : "border-transparent text-zinc-400"
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-3">
@@ -176,42 +140,14 @@ export default function DashboardMockup() {
                     </span>
                     <span className="hidden text-right text-[11px] font-mono text-zinc-500 sm:block">{file.size}</span>
                     <span className="text-right text-[11px] font-mono text-zinc-500">{file.modified}</span>
-                  </button>
+                  </div>
                 );
               })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {visibleFiles.map((file) => {
-                const Icon = file.icon;
-                return (
-                  <button
-                    key={file.name}
-                    type="button"
-                    onClick={() => setSelectedName(file.name)}
-                    aria-pressed={selectedName === file.name}
-                    className={`rounded-xl border p-3 text-left ${
-                      selectedName === file.name ? "border-white/10 bg-white/5" : "border-transparent hover:bg-white/5"
-                    }`}
-                  >
-                    <span className={`mb-3 inline-block rounded-lg p-2 ${file.accent}`}><Icon className="h-4 w-4" /></span>
-                    <span className="block truncate text-xs text-zinc-200">{file.name}</span>
-                    <span className="block pt-1 text-[10px] font-mono text-zinc-500">{file.size}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          </div>
 
-          {visibleFiles.length === 0 && (
-            <p className="rounded-xl border border-white/5 py-8 text-center text-xs text-zinc-500">No preview files found.</p>
-          )}
-
-          {selectedFile && (
-            <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-zinc-500">
-              Selected: <span className="text-zinc-300">{selectedFile.name}</span> - sample {selectedFile.type} item
-            </p>
-          )}
+          <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-zinc-500">
+            Selected: <span className="text-zinc-300">{previewFiles[0].name}</span> - sample {previewFiles[0].type} item
+          </p>
         </div>
       </div>
     </div>

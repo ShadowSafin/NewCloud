@@ -100,7 +100,7 @@ body {
 
 /* Premium radial lighting effects */
 .radial-spotlight {
-  background: radial-gradient(circle 800px at var(--x, 0px) var(--y, 0px), rgba(6, 182, 212, 0.06), transparent 80%);
+  background: radial-gradient(circle 800px at 50% 0%, rgba(6, 182, 212, 0.06), transparent 80%);
 }
 
 .radial-bg {
@@ -112,8 +112,17 @@ body {
   transform: scale(1.05);
 }
 
+.hero-video-fallback {
+  background: radial-gradient(ellipse at 52% 20%, rgba(37, 99, 235, 0.15), rgba(3, 3, 3, 0) 60%);
+}
+
+.defer-render {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
+}
+
 code {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-reduced-motion: reduce) {
