@@ -22,14 +22,15 @@ export default function Hero() {
         </div>
 
         <h1 className="text-4xl sm:text-6xl md:text-[80px] font-medium leading-[1.05] tracking-tighter text-foreground mb-6 max-w-3xl">
-          Your files.<br />
+          Self-hosted cloud storage.<br />
           Your hardware.<br />
           Your cloud.
         </h1>
 
         <p className="text-zinc-400 text-sm sm:text-base md:text-lg max-w-2xl leading-relaxed tracking-tight mb-10 px-4">
-          NexxCloud stores immutable SHA-256 blobs on your server, keeps large
-          uploads resumable, and delivers media securely through one polished interface.
+          NexxCloud is private file storage for your own server. It keeps large
+          uploads resumable, delivers media securely, and connects your desktop
+          and mobile devices through one polished interface.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 mb-10 w-full max-w-md justify-center">
