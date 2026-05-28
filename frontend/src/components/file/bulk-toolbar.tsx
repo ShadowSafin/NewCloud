@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFileStore } from "@/store/fileStore";
+import { useToastStore } from "@/store/toastStore";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { formatFileSize } from "@/lib/utils";
 import { Trash2, RotateCcw, FolderInput, Copy, Download, X, CheckSquare, Square } from "lucide-react";
 
 interface BulkToolbarProps {
@@ -11,11 +13,38 @@ interface BulkToolbarProps {
 }
 
 export function BulkToolbar({ onMove, onCopy }: BulkToolbarProps) {
-  const { selectedIds, selectAll, clearSelection, trashMultiple, bulkRestore, permanentDeleteMultiple } = useFileStore();
+  const { files, folders, selectedIds, selectAll, clearSelection, trashMultiple, bulkRestore, permanentDeleteMultiple, downloadSelected } = useFileStore();
+  const { addToast } = useToastStore();
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSummary, setDownloadSummary] = useState<string | null>(null);
 
   const count = selectedIds.size;
+  const selectedSummary = useMemo(() => {
+    let selectedFileCount = 0;
+    let selectedFolderCount = 0;
+    let selectedBytes = 0;
+
+    for (const file of files) {
+      if (selectedIds.has(file.id)) {
+        selectedFileCount++;
+        selectedBytes += file.size || 0;
+      }
+    }
+    for (const folder of folders) {
+      if (selectedIds.has(folder.id)) selectedFolderCount++;
+    }
+
+    const sizeLabel = selectedBytes > 0 ? formatFileSize(selectedBytes) : "0 B";
+    const folderLabel = selectedFolderCount > 0 ? ` + ${selectedFolderCount} folder(s)` : "";
+    return `${selectedFileCount} file(s)${folderLabel} - ${sizeLabel}`;
+  }, [files, folders, selectedIds]);
+
+  useEffect(() => {
+    setDownloadSummary(null);
+  }, [selectedIds]);
+
   if (count === 0) return null;
 
   const isTrashView = typeof window !== "undefined" && window.location.search.includes("view=trash");
@@ -36,10 +65,28 @@ export function BulkToolbar({ onMove, onCopy }: BulkToolbarProps) {
     setShowRestoreConfirm(false);
   };
 
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const summary = await downloadSelected(Array.from(selectedIds));
+      const sizeLabel = summary.totalBytes > 0 ? formatFileSize(summary.totalBytes) : "unknown size";
+      const label = `${summary.fileCount} file(s) - ${sizeLabel}`;
+      setDownloadSummary(label);
+      addToast(`Download started: ${label}`, "success", 5000);
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.message || "Failed to start download";
+      addToast(message, "error", 7000);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <>
       <div className="flex items-center gap-2 px-4 py-2.5 bg-canvas-card border border-hairline rounded-sm mb-4 animate-fade-in">
-        <span className="text-sm text-ink font-mono mr-2">{count} selected</span>
+        <span className="text-sm text-ink font-mono mr-2">
+          {count} selected <span className="text-body-mid">({selectedSummary})</span>
+        </span>
 
         <div className="h-4 w-px bg-hairline" />
 
@@ -55,6 +102,14 @@ export function BulkToolbar({ onMove, onCopy }: BulkToolbarProps) {
           </>
         ) : (
           <>
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs text-ink hover:bg-canvas-soft transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {isDownloading ? "Preparing..." : downloadSummary ? `Download (${downloadSummary})` : "Download"}
+            </button>
             <button
               onClick={onMove}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs text-ink hover:bg-canvas-soft transition-colors"

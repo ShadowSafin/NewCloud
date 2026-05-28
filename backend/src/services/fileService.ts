@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import fs from "fs";
-import { PrismaClient, File } from "@prisma/client";
+import { PrismaClient, File, Folder } from "@prisma/client";
 import { FileRepository } from "../repositories/FileRepository";
 import { VersionService } from "./versionService";
 import { storageService } from "./storageService";
@@ -10,6 +10,16 @@ import { storageBlobService } from "./storageBlobService";
 import { storageAccountingService } from "./storageAccountingService";
 import { thumbnailService } from "./thumbnailService";
 import { NotFoundError, ForbiddenError, BadRequestError } from "../utils/errors";
+
+export interface BulkDownloadSelection {
+  itemIds?: string[];
+  fileIds?: string[];
+  folderIds?: string[];
+}
+
+export type BulkDownloadEntry =
+  | { type: "directory"; archivePath: string }
+  | { type: "file"; archivePath: string; file: File };
 
 export class FileService {
   private fileRepository: FileRepository;
@@ -159,6 +169,135 @@ export class FileService {
   async getFilePath(userId: string, id: string): Promise<string> {
     const file = await this.findById(userId, id);
     return file.path;
+  }
+
+  async getBulkDownloadEntries(userId: string, selection: BulkDownloadSelection): Promise<BulkDownloadEntry[]> {
+    const itemIds = Array.from(new Set(selection.itemIds || [])).filter(Boolean);
+    const fileIds = new Set(Array.from(new Set(selection.fileIds || [])).filter(Boolean));
+    const folderIds = new Set(Array.from(new Set(selection.folderIds || [])).filter(Boolean));
+
+    if (itemIds.length === 0 && fileIds.size === 0 && folderIds.size === 0) {
+      throw new BadRequestError("Select at least one file or folder to download");
+    }
+
+    if (itemIds.length > 0) {
+      const [matchedFiles, matchedFolders] = await Promise.all([
+        this.prisma.file.findMany({
+          where: { userId, id: { in: itemIds }, deletedAt: null },
+          select: { id: true },
+        }),
+        this.prisma.folder.findMany({
+          where: { userId, id: { in: itemIds }, deletedAt: null },
+          select: { id: true },
+        }),
+      ]);
+
+      matchedFiles.forEach((file) => fileIds.add(file.id));
+      matchedFolders.forEach((folder) => folderIds.add(folder.id));
+    }
+
+    const entries: BulkDownloadEntry[] = [];
+    const usedArchivePaths = new Set<string>();
+    const addedFileIds = new Set<string>();
+    const missingFiles: string[] = [];
+
+    const addEntryPath = (requestedPath: string, isDirectory = false): string => {
+      const parsed = path.posix.parse(requestedPath);
+      const basePath = requestedPath.replace(/\/+$/, "");
+      const ext = isDirectory ? "" : parsed.ext;
+      const withoutExt = isDirectory ? basePath : basePath.slice(0, basePath.length - ext.length);
+
+      let candidate = isDirectory ? `${basePath}/` : basePath;
+      let counter = 1;
+      while (usedArchivePaths.has(candidate.toLowerCase())) {
+        candidate = isDirectory ? `${withoutExt} (${counter})/` : `${withoutExt} (${counter})${ext}`;
+        counter++;
+      }
+
+      usedArchivePaths.add(candidate.toLowerCase());
+      return candidate;
+    };
+
+    const addFile = (file: File, archivePath: string) => {
+      if (addedFileIds.has(file.id)) return;
+      if (!storageService.isSafePathGlobal(file.path) || !fs.existsSync(file.path)) {
+        missingFiles.push(file.originalName);
+        return;
+      }
+
+      entries.push({
+        type: "file",
+        archivePath: addEntryPath(archivePath),
+        file,
+      });
+      addedFileIds.add(file.id);
+    };
+
+    const sanitizeArchiveSegment = (value: string) => {
+      const sanitized = value
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+        .replace(/\s+/g, " ")
+        .trim();
+      return sanitized || "untitled";
+    };
+
+    const joinArchivePath = (...segments: string[]) => segments.map(sanitizeArchiveSegment).join("/");
+
+    const addFolder = async (folder: Folder, archivePath: string): Promise<void> => {
+      const folderPath = addEntryPath(archivePath, true);
+      entries.push({ type: "directory", archivePath: folderPath });
+
+      const files = await this.prisma.file.findMany({
+        where: { userId, folderId: folder.id, deletedAt: null },
+        orderBy: { originalName: "asc" },
+      });
+      for (const file of files) {
+        addFile(file, `${folderPath}${sanitizeArchiveSegment(file.originalName)}`);
+      }
+
+      const childFolders = await this.prisma.folder.findMany({
+        where: { userId, parentId: folder.id, deletedAt: null },
+        orderBy: { name: "asc" },
+      });
+      for (const child of childFolders) {
+        await addFolder(child, `${folderPath}${sanitizeArchiveSegment(child.name)}`);
+      }
+    };
+
+    const selectedFileIds = Array.from(fileIds);
+    const selectedFolderIds = Array.from(folderIds);
+
+    if (selectedFileIds.length > 0) {
+      const files = await this.prisma.file.findMany({
+        where: { userId, id: { in: selectedFileIds }, deletedAt: null },
+        orderBy: { originalName: "asc" },
+      });
+      for (const file of files) {
+        addFile(file, joinArchivePath(file.originalName));
+      }
+    }
+
+    if (selectedFolderIds.length > 0) {
+      const folders = await this.prisma.folder.findMany({
+        where: { userId, id: { in: selectedFolderIds }, deletedAt: null },
+        orderBy: { name: "asc" },
+      });
+      for (const folder of folders) {
+        await addFolder(folder, joinArchivePath(folder.name));
+      }
+    }
+
+    if (missingFiles.length > 0) {
+      const visibleNames = missingFiles.slice(0, 5).join(", ");
+      const suffix = missingFiles.length > 5 ? ` and ${missingFiles.length - 5} more` : "";
+      throw new BadRequestError(`Cannot download ${missingFiles.length} file(s) because their stored data is missing: ${visibleNames}${suffix}`);
+    }
+
+    if (entries.length === 0) {
+      throw new NotFoundError("No downloadable files found");
+    }
+
+    return entries;
   }
 
   async update(userId: string, id: string, originalName: string): Promise<File> {

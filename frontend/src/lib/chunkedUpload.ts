@@ -1,10 +1,17 @@
-import { apiClient } from "./api";
+import axios, { AxiosProgressEvent, AxiosRequestConfig } from "axios";
+import { apiClient, resolveUploadApiBaseUrl } from "./api";
 
 const MAX_CONCURRENT = 3;
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 8;
+const BASE_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 30000;
 const MERGE_POLL_INTERVAL_MS = 1000;
-const MAX_MERGE_WAIT_MS = 24 * 60 * 60 * 1000;
+const MAX_MERGE_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_STATUS_POLL_FAILURES = 20;
 const STORAGE_KEY = "nexxcloud-upload-queue";
+
+let activeChunkUploads = 0;
+const chunkUploadQueue: Array<() => void> = [];
 
 export interface UploadSession {
   sessionId: string;
@@ -47,6 +54,47 @@ interface PersistedTask {
 
 // --- API helpers ---
 
+function retryDelay(attempt: number): number {
+  const exponential = Math.min(MAX_RETRY_DELAY_MS, BASE_RETRY_DELAY_MS * 2 ** attempt);
+  return exponential + Math.floor(Math.random() * 500);
+}
+
+async function withChunkUploadSlot<T>(operation: () => Promise<T>): Promise<T> {
+  if (activeChunkUploads >= MAX_CONCURRENT) {
+    await new Promise<void>((resolve) => chunkUploadQueue.push(resolve));
+  }
+
+  activeChunkUploads++;
+  try {
+    return await operation();
+  } finally {
+    activeChunkUploads = Math.max(0, activeChunkUploads - 1);
+    chunkUploadQueue.shift()?.();
+  }
+}
+
+function uploadErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const apiMessage = (error.response?.data as { error?: string; message?: string } | undefined)?.error ||
+      (error.response?.data as { error?: string; message?: string } | undefined)?.message;
+    if (apiMessage) return apiMessage;
+
+    if (!error.response) {
+      return "Network timeout while uploading. NexxCloud will retry the missing chunks.";
+    }
+  }
+
+  return error instanceof Error ? error.message : "Upload failed";
+}
+
+async function uploadRequestConfig(extra: AxiosRequestConfig = {}): Promise<AxiosRequestConfig> {
+  return {
+    ...extra,
+    baseURL: await resolveUploadApiBaseUrl(),
+    timeout: 0,
+  };
+}
+
 export async function initiateUpload(
   filename: string,
   mimeType: string,
@@ -58,7 +106,7 @@ export async function initiateUpload(
     mimeType,
     totalSize,
     folderId,
-  });
+  }, await uploadRequestConfig());
   return res.data.data;
 }
 
@@ -73,30 +121,30 @@ export async function uploadChunk(
   formData.append("chunk", data);
   if (hash) formData.append("hash", hash);
 
-  await apiClient.post(`/uploads/${sessionId}/chunk/${chunkIndex}`, formData, {
+  await apiClient.post(`/uploads/${sessionId}/chunk/${chunkIndex}`, formData, await uploadRequestConfig({
     headers: { "Content-Type": "multipart/form-data" },
-    onUploadProgress: (e) => {
+    onUploadProgress: (e: AxiosProgressEvent) => {
       if (onProgress && e.total) onProgress(e.loaded, e.total);
     },
-  });
+  }));
 }
 
 export async function completeUpload(sessionId: string): Promise<any> {
-  const res = await apiClient.post(`/uploads/${sessionId}/complete`);
+  const res = await apiClient.post(`/uploads/${sessionId}/complete`, undefined, await uploadRequestConfig());
   return res.data.data;
 }
 
 export async function cancelUpload(sessionId: string): Promise<void> {
-  await apiClient.post(`/uploads/${sessionId}/cancel`);
+  await apiClient.post(`/uploads/${sessionId}/cancel`, undefined, await uploadRequestConfig());
 }
 
 export async function getUploadStatus(sessionId: string): Promise<any> {
-  const res = await apiClient.get(`/uploads/status/${sessionId}`);
+  const res = await apiClient.get(`/uploads/status/${sessionId}`, await uploadRequestConfig());
   return res.data.data;
 }
 
 export async function getResumeInfo(sessionId: string): Promise<any> {
-  const res = await apiClient.get(`/uploads/${sessionId}/resume`);
+  const res = await apiClient.get(`/uploads/${sessionId}/resume`, await uploadRequestConfig());
   return res.data.data;
 }
 
@@ -109,9 +157,21 @@ async function waitForMergeCompletion(
   onProgress?: (task: UploadTask) => void
 ): Promise<void> {
   const startedAt = Date.now();
+  let failedPolls = 0;
 
   while (task.status === "merging") {
-    const status = await getUploadStatus(task.sessionId);
+    let status: any;
+    try {
+      status = await getUploadStatus(task.sessionId);
+      failedPolls = 0;
+    } catch (error) {
+      failedPolls++;
+      if (failedPolls > MAX_STATUS_POLL_FAILURES) {
+        throw new Error(uploadErrorMessage(error));
+      }
+      await sleep(retryDelay(Math.min(failedPolls, MAX_RETRIES)));
+      continue;
+    }
 
     if (status.status === "completed") {
       task.status = "completed";
@@ -138,11 +198,18 @@ async function waitForMergeCompletion(
 // --- Chunk hashing ---
 
 async function computeChunkHash(data: Blob): Promise<string> {
-  const buffer = await data.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle?.digest) return "";
+
+  try {
+    const buffer = await data.arrayBuffer();
+    const hashBuffer = await subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return "";
+  }
 }
 
 // --- Promise pool for concurrency control ---
@@ -170,27 +237,6 @@ async function promisePool<T>(
 
 // --- Persistence ---
 
-function persistQueue(tasks: Map<string, UploadTask>): void {
-  const serializable: PersistedTask[] = [];
-  tasks.forEach((task) => {
-    if (task.status === "completed" || task.status === "cancelled") return;
-    serializable.push({
-      id: task.id,
-      sessionId: task.sessionId,
-      filename: task.filename,
-      totalSize: task.totalSize,
-      chunkSize: task.chunkSize,
-      totalChunks: task.totalChunks,
-      uploadedChunks: Array.from(task.uploadedChunks),
-      status: task.status,
-      folderId: task.folderId,
-    });
-  });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
-  } catch {}
-}
-
 export function loadPersistedTasks(): PersistedTask[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -207,8 +253,6 @@ export function clearPersistedTasks(): void {
 }
 
 // --- Upload task management ---
-
-const activeUploads = new Map<string, AbortController>();
 
 export async function uploadFileChunked(
   file: File,
@@ -303,39 +347,58 @@ async function runUpload(
   let bytesUploaded = task.uploadedChunks.size * task.chunkSize;
   const startTime = Date.now();
 
+  const markChunkUploaded = (chunkIndex: number, size: number) => {
+    if (task.uploadedChunks.has(chunkIndex)) return;
+    task.uploadedChunks.add(chunkIndex);
+    task.failedChunks.delete(chunkIndex);
+    bytesUploaded += size;
+
+    const elapsed = (Date.now() - startTime) / 1000;
+    task.speed = elapsed > 0 ? bytesUploaded / elapsed : 0;
+    task.progress = task.uploadedChunks.size / task.totalChunks;
+    onProgress?.(task);
+  };
+
+  const serverAlreadyHasChunk = async (chunkIndex: number): Promise<boolean> => {
+    try {
+      const status = await getUploadStatus(task.sessionId);
+      return Boolean(status.chunks?.some((chunk: any) => chunk.chunkIndex === chunkIndex && chunk.uploaded));
+    } catch {
+      return false;
+    }
+  };
+
   const uploadSingleChunk = async (chunkIndex: number): Promise<void> => {
     if (task.status === "paused" || task.status === "cancelled") return;
 
     const start = chunkIndex * task.chunkSize;
     const end = Math.min(start + task.chunkSize, task.totalSize);
     const chunk = task.file.slice(start, end);
+    const chunkSize = end - start;
+    const hash = await computeChunkHash(chunk);
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         // Re-check status before each attempt
         if ((task.status as string) === "paused" || (task.status as string) === "cancelled") return;
 
-        const hash = await computeChunkHash(chunk);
-        await uploadChunk(task.sessionId, chunkIndex, chunk, hash);
-
-        task.uploadedChunks.add(chunkIndex);
-        task.failedChunks.delete(chunkIndex);
-        bytesUploaded += end - start;
-
-        // Calculate speed
-        const elapsed = (Date.now() - startTime) / 1000;
-        task.speed = elapsed > 0 ? bytesUploaded / elapsed : 0;
-        task.progress = task.uploadedChunks.size / task.totalChunks;
-
-        onProgress?.(task);
+        await withChunkUploadSlot(() => uploadChunk(task.sessionId, chunkIndex, chunk, hash || undefined));
+        markChunkUploaded(chunkIndex, chunkSize);
         return;
       } catch (err) {
+        if (await serverAlreadyHasChunk(chunkIndex)) {
+          markChunkUploaded(chunkIndex, chunkSize);
+          return;
+        }
+
         if (attempt === MAX_RETRIES - 1) {
           task.failedChunks.set(chunkIndex, MAX_RETRIES);
-          throw err;
+          throw new Error(uploadErrorMessage(err));
         }
-        // Exponential backoff
-        await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+
+        task.failedChunks.set(chunkIndex, attempt + 1);
+        onProgress?.(task);
+        await sleep(retryDelay(attempt));
       }
     }
   };
@@ -352,13 +415,30 @@ async function runUpload(
     task.status = "merging";
     onProgress?.(task);
 
-    await completeUpload(task.sessionId);
+    await completeUploadWithRetry(task.sessionId);
     await waitForMergeCompletion(task, onProgress);
   } catch (err: any) {
     if (task.status !== "paused" && task.status !== "cancelled") {
       task.status = "failed";
-      task.error = err.message || "Upload failed";
+      task.error = uploadErrorMessage(err);
       onProgress?.(task);
+    }
+  }
+}
+
+async function completeUploadWithRetry(sessionId: string): Promise<void> {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      await completeUpload(sessionId);
+      return;
+    } catch (error) {
+      try {
+        const status = await getUploadStatus(sessionId);
+        if (status.status === "merging" || status.status === "completed") return;
+      } catch {}
+
+      if (attempt === MAX_RETRIES - 1) throw new Error(uploadErrorMessage(error));
+      await sleep(retryDelay(attempt));
     }
   }
 }

@@ -1,117 +1,80 @@
-import { Queue } from "bullmq";
-import { createRedisConnection } from "./redis";
+import { createRuntimeQueue } from "./runtimeQueue";
 
 const defaultOpts = {
   removeOnComplete: 100,
   removeOnFail: 50,
 };
 
-export const thumbnailQueue = new Queue("thumbnail-generation", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const thumbnailQueue = createRuntimeQueue("thumbnail-generation", {
     attempts: 3,
     backoff: { type: "exponential", delay: 1000 },
     ...defaultOpts,
-  },
 });
 
-export const chunkMergeQueue = new Queue("chunk-merge", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const chunkMergeQueue = createRuntimeQueue("chunk-merge", {
     attempts: 3,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const trashCleanupQueue = new Queue("trash-cleanup", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const trashCleanupQueue = createRuntimeQueue("trash-cleanup", {
     attempts: 3,
     backoff: { type: "exponential", delay: 5000 },
     ...defaultOpts,
-  },
 });
 
-export const fileHashQueue = new Queue("file-hash", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const fileHashQueue = createRuntimeQueue("file-hash", {
     attempts: 3,
     backoff: { type: "exponential", delay: 1000 },
     ...defaultOpts,
-  },
 });
 
-export const dedupProcessorQueue = new Queue("dedup-processor", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const dedupProcessorQueue = createRuntimeQueue("dedup-processor", {
     attempts: 2,
     backoff: { type: "exponential", delay: 3000 },
     ...defaultOpts,
-  },
 });
 
-export const versionCleanupQueue = new Queue("version-cleanup", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const versionCleanupQueue = createRuntimeQueue("version-cleanup", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const storageCalcQueue = new Queue("storage-calc", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const storageCalcQueue = createRuntimeQueue("storage-calc", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const storageIntegrityQueue = new Queue("storage-integrity", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const storageIntegrityQueue = createRuntimeQueue("storage-integrity", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const orphanBlobCleanupQueue = new Queue("orphan-blob-cleanup", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const orphanBlobCleanupQueue = createRuntimeQueue("orphan-blob-cleanup", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const referenceVerificationQueue = new Queue("reference-verification", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const referenceVerificationQueue = createRuntimeQueue("reference-verification", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const chunkCleanupQueue = new Queue("chunk-cleanup", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const chunkCleanupQueue = createRuntimeQueue("chunk-cleanup", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
-export const metadataRepairQueue = new Queue("metadata-repair", {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
+export const metadataRepairQueue = createRuntimeQueue("metadata-repair", {
     attempts: 2,
     backoff: { type: "exponential", delay: 2000 },
     ...defaultOpts,
-  },
 });
 
 export const allQueues = [

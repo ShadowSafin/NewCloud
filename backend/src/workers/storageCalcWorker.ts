@@ -1,13 +1,13 @@
-import { Worker, Job } from "bullmq";
-import { createRedisConnection } from "../lib/redis";
+import { Job } from "bullmq";
+import { createRuntimeWorker, RuntimeWorker } from "../lib/runtimeQueue";
 import { prisma } from "../db";
 
 interface StorageCalcJobData {
   userId: string;
 }
 
-export function createStorageCalcWorker(): Worker {
-  const worker = new Worker(
+export function createStorageCalcWorker(): RuntimeWorker {
+  const worker = createRuntimeWorker(
     "storage-calc",
     async (job: Job<StorageCalcJobData>) => {
       const { userId } = job.data;
@@ -42,10 +42,7 @@ export function createStorageCalcWorker(): Worker {
       console.log(`User ${userId}: ${used} bytes used, ${trashSize} bytes in trash`);
       return { used, trashSize, fileCount: result._count };
     },
-    {
-      connection: createRedisConnection(),
-      concurrency: 1,
-    }
+    1
   );
 
   worker.on("completed", (job) => {

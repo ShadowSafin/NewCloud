@@ -5,6 +5,12 @@ export const API_BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : "/api";
 export const resolveBackendUrl = (url: string) =>
   API_ORIGIN && url.startsWith("/api/") ? `${API_ORIGIN}${url}` : url;
 
+const DIRECT_UPLOAD_PORTS = (process.env.NEXT_PUBLIC_UPLOAD_API_PORTS || "4000,4010")
+  .split(",")
+  .map((port) => port.trim())
+  .filter(Boolean);
+const DIRECT_UPLOAD_HEALTH_TIMEOUT_MS = 1500;
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -32,6 +38,77 @@ apiClient.interceptors.request.use(
 
 let isRefreshing = false;
 let failedQueue: { resolve: (token: string) => void; reject: (reason?: any) => void }[] = [];
+let uploadApiBaseUrl: string | null = null;
+let uploadApiBaseUrlPromise: Promise<string> | null = null;
+
+const authRefreshExemptPaths = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/logout",
+];
+
+const shouldSkipAuthRefresh = (config?: InternalAxiosRequestConfig) => {
+  const requestUrl = config?.url || "";
+  return authRefreshExemptPaths.some((path) => requestUrl.includes(path));
+};
+
+const isLanUploadHost = (hostname: string) => {
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return true;
+  if (hostname.endsWith(".local") || hostname.endsWith(".lan") || hostname.endsWith(".home")) return true;
+  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) return true;
+  if (hostname.startsWith("172.")) {
+    const secondOctet = Number.parseInt(hostname.split(".")[1] || "", 10);
+    return secondOctet >= 16 && secondOctet <= 31;
+  }
+  return false;
+};
+
+const directUploadCandidates = () => {
+  if (API_ORIGIN || typeof window === "undefined") return [];
+
+  const { protocol, hostname, port } = window.location;
+  if (protocol !== "http:" || !isLanUploadHost(hostname)) return [];
+
+  return DIRECT_UPLOAD_PORTS
+    .filter((candidatePort) => candidatePort !== port)
+    .map((candidatePort) => `${protocol}//${hostname}:${candidatePort}/api`);
+};
+
+const canReachApiBase = async (baseURL: string) => {
+  try {
+    await axios.get(`${baseURL}/health`, { timeout: DIRECT_UPLOAD_HEALTH_TIMEOUT_MS });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const resolveUploadApiBaseUrl = async () => {
+  if (uploadApiBaseUrl) return uploadApiBaseUrl;
+  if (API_ORIGIN || typeof window === "undefined") {
+    uploadApiBaseUrl = API_BASE_URL;
+    return uploadApiBaseUrl;
+  }
+
+  uploadApiBaseUrlPromise ??= (async () => {
+    for (const candidate of directUploadCandidates()) {
+      if (await canReachApiBase(candidate)) return candidate;
+    }
+    return API_BASE_URL;
+  })();
+
+  uploadApiBaseUrl = await uploadApiBaseUrlPromise;
+  return uploadApiBaseUrl;
+};
+
+const resolveApiDownloadUrl = (url: string, baseURL: string) => {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/^https?:\/\//i.test(baseURL)) {
+    return `${new URL(baseURL).origin}${url.startsWith("/") ? url : `/${url}`}`;
+  }
+  return url;
+};
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -59,7 +136,7 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !shouldSkipAuthRefresh(originalRequest)) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -137,16 +214,18 @@ export const authApi = {
 
 // Files API
 export const filesApi = {
-  upload: (formData: FormData, onProgress?: (progress: number) => void) =>
+  upload: async (formData: FormData, onProgress?: (progress: number) => void) =>
     apiClient.post("/files/upload", formData, {
+      baseURL: await resolveUploadApiBaseUrl(),
       headers: { "Content-Type": undefined },
       onUploadProgress: onProgress ? (progressEvent) => {
         const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
         onProgress(percent);
       } : undefined,
     }),
-  uploadMultiple: (formData: FormData, onProgress?: (progress: number) => void) =>
+  uploadMultiple: async (formData: FormData, onProgress?: (progress: number) => void) =>
     apiClient.post("/files/upload-multiple", formData, {
+      baseURL: await resolveUploadApiBaseUrl(),
       headers: { "Content-Type": undefined },
       onUploadProgress: onProgress ? (progressEvent) => {
         const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
@@ -156,8 +235,21 @@ export const filesApi = {
   list: (params?: { folderId?: string; search?: string; sort?: string; order?: string }) =>
     apiClient.get("/files", { params }),
   getById: (id: string) => apiClient.get(`/files/${id}`),
-  download: (id: string) =>
-    apiClient.get(`/files/${id}/download`, { responseType: "blob" }),
+  download: async (id: string) =>
+    apiClient.get(`/files/${id}/download`, {
+      baseURL: await resolveUploadApiBaseUrl(),
+      responseType: "blob",
+      timeout: 0,
+    }),
+  createBulkDownload: async (itemIds: string[]) => {
+    const baseURL = await resolveUploadApiBaseUrl();
+    const response = await apiClient.post("/files/download-bulk/sign", { itemIds }, { baseURL });
+    const url = response.data?.data?.url;
+    if (typeof url === "string") {
+      response.data.data.url = resolveApiDownloadUrl(url, baseURL);
+    }
+    return response;
+  },
   stream: (id: string) =>
     apiClient.get(`/files/${id}/stream`, { responseType: "blob" }),
   update: (id: string, data: { originalName: string }) =>

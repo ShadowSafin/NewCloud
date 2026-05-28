@@ -26,6 +26,14 @@ export interface FolderItem {
   deletedAt?: string | null;
 }
 
+export interface BulkDownloadResult {
+  url: string;
+  fileCount: number;
+  folderCount: number;
+  entryCount: number;
+  totalBytes: number;
+}
+
 interface FileState {
   files: FileItem[];
   folders: FolderItem[];
@@ -68,6 +76,7 @@ interface FileState {
   uploadFile: (file: File, folderId?: string | null, onProgress?: (progress: number) => void) => Promise<void>;
   uploadMultipleFiles: (files: File[], folderId?: string | null, onProgress?: (progress: number) => void) => Promise<void>;
   downloadFile: (id: string, originalName: string) => Promise<void>;
+  downloadSelected: (ids?: string[]) => Promise<BulkDownloadResult>;
   renameFile: (id: string, originalName: string) => Promise<void>;
   deleteFile: (id: string) => Promise<void>;
   trashFile: (id: string) => Promise<void>;
@@ -331,6 +340,41 @@ export const useFileStore = create<FileState>((set, get) => ({
       document.body.removeChild(a);
     } catch (error: any) {
       set({ error: error.response?.data?.error || "Download failed" });
+    }
+  },
+
+  downloadSelected: async (ids) => {
+    const { selectedIds } = get();
+    const requestedIds = ids?.length ? ids : Array.from(selectedIds);
+
+    if (requestedIds.length === 0) {
+      set({ error: "Select files or folders to download" });
+      throw new Error("Select files or folders to download");
+    }
+
+    try {
+      const response = await filesApi.createBulkDownload(requestedIds);
+      const data = response.data?.data || {};
+      const url = data.url;
+      if (!url) throw new Error("Download link was not created");
+
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+
+      return {
+        url,
+        fileCount: Number(data.fileCount || 0),
+        folderCount: Number(data.folderCount || 0),
+        entryCount: Number(data.entryCount || 0),
+        totalBytes: Number(data.totalBytes || 0),
+      };
+    } catch (error: any) {
+      set({ error: error.response?.data?.error || error.message || "Download failed" });
+      throw error;
     }
   },
 

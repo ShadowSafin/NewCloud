@@ -204,6 +204,7 @@ export function FileCard({
 
     return (
       <div
+        data-file-card
         className={cn(
           "group relative rounded-xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none h-full flex flex-col justify-between overflow-hidden",
           isSelected ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_rgba(6,182,212,0.2)]" : "",
@@ -301,6 +302,7 @@ export function FileCard({
 
   return (
     <div
+      data-file-card
       className={cn(
         "group flex items-center gap-3 px-4 py-2.5 rounded-xl border border-white/[0.05] glass-card glass-card-hover cursor-pointer select-none",
         isSelected ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.15)]" : "",

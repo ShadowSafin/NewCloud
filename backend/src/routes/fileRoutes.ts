@@ -45,6 +45,8 @@ router.get("/storage", authenticate, asyncHandler(async (req: any, res: any) => 
 router.post("/upload", authenticate, uploadLimiter, upload.single("file"), asyncHandler(validateUpload), asyncHandler(fileController.upload));
 router.post("/upload-multiple", authenticate, uploadLimiter, upload.array("files", 100), asyncHandler(fileController.uploadMultiple));
 router.post("/bulk", authenticate, asyncHandler(fileController.bulkAction));
+router.post("/download-bulk/sign", authenticate, asyncHandler(fileController.createBulkDownloadTicket));
+router.get("/download-bulk/:ticket", asyncHandler(fileController.bulkDownload));
 
 router.get("/", authenticate, validateQuery(fileQuerySchema), asyncHandler(fileController.findAll));
 router.get("/recent", authenticate, asyncHandler(fileController.recent));
