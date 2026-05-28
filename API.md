@@ -501,7 +501,9 @@ curl "$API_URL/network/status" \
 ```
 
 The response uses configured `HOST_LAN_IP` and `HOST_HOSTNAME` when available and includes
-locally detected IPv4 addresses. The frontend settings view uses this data to display
+locally detected IPv4 addresses. Address selection prefers private Wi-Fi/Ethernet
+interfaces and demotes virtual, WSL, Docker, VPN, Bluetooth, and host-only adapters such
+as VirtualBox `192.168.56.*`. The frontend settings view uses this data to display
 connectivity URLs and a QR representation.
 
 ## WebSocket Transport

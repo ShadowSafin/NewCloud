@@ -4,7 +4,7 @@
   "description": "NexxCloud native server host for Windows and Linux",
   "main": "dist/main.js",
   "author": "NexxCloud",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build:host": "tsc -p tsconfig.json",
     "prepare:runtime": "node scripts/stage-runtime.mjs",

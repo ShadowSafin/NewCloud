@@ -11,7 +11,8 @@
     <a href="#deploy-nexxcloud-in-one-command"><strong>Deploy NexxCloud</strong></a> |
     <a href="./ARCHITECTURE.md">Architecture</a> |
     <a href="./API.md">API Reference</a> |
-    <a href="./CONTRIBUTING.md">Contributing</a>
+    <a href="./CONTRIBUTING.md">Contributing</a> |
+    <a href="./LICENSE">License</a>
   </p>
   <p>
     <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs">
@@ -66,9 +67,11 @@ schema synchronization.
 
 NexxCloud is a LAN-friendly, self-hosted cloud storage application designed for people who
 want the convenience of a polished cloud drive while keeping the binary data on hardware
-they control. A Next.js interface speaks to an Express API; PostgreSQL owns metadata,
-Redis and BullMQ operate asynchronous maintenance, and the filesystem stores immutable
-SHA-256 addressed blobs.
+they control. A Next.js interface speaks to an Express API; PostgreSQL owns metadata in
+the standard Compose deployment, Redis and BullMQ operate asynchronous maintenance, and
+the filesystem stores immutable SHA-256 addressed blobs. The Windows desktop server host
+packages the same product experience with a local SQLite database, in-process background
+workers, live service logs, and LAN dashboard URLs.
 
 The platform is built around one principle: file operations must preserve storage
 integrity. Uploads become reference-counted blobs, trash and restore operations recalculate
@@ -84,6 +87,7 @@ NexxCloud sits between a personal NAS and a modern hosted drive:
 | LAN-first access           | The API exposes network status and mDNS publishes local service discovery names.                                            |
 | Integrity before expansion | Blob references, storage totals, stale chunks, and metadata are actively verified.                                          |
 | One polished web surface   | A glass-panel file manager, previews, upload queue, sharing, settings, and landing experience ship in the Next.js frontend. |
+| Desktop server option      | A packaged NexxCloud Server app runs the backend/frontend locally, shows live logs, and displays usable LAN URLs.           |
 
 ## Features
 
@@ -100,6 +104,7 @@ NexxCloud sits between a personal NAS and a modern hosted drive:
 | Previews                  | Images, video, audio, PDF, and selected text/code content render in the browser; thumbnail generation uses Sharp, FFmpeg, and Poppler.                                  |
 | Integrity maintenance     | Workers repair storage totals, reference counts, blob metadata, legacy attachment state, old chunks, trash retention, and unreferenced blobs.                           |
 | Deployment                | Docker Compose provisions PostgreSQL 16, Redis 7, the Express API, the Next.js UI, and a dedicated worker process.                                                      |
+| Native server             | Electron-based NexxCloud Server packages the app for desktop use with SQLite, in-process queues/cache, live logs, and LAN URL discovery.                                |
 | Visual system             | Dark cinematic surfaces, glass treatments, cyan/violet accent lighting, Framer Motion landing transitions, and dense file-manager controls.                             |
 
 ## Screenshots
@@ -150,6 +155,7 @@ flowchart LR
 | `backend/src/server.ts` | HTTP entrypoint, CORS and security middleware, API mounting, Bull Board, storage initialization, mDNS publication, and WebSocket server startup.     |
 | `backend/src/services/` | Domain logic for files, folders, blobs, accounting, uploads, media tokens, authentication, sharing, versions, storage paths, and thumbnails.         |
 | `backend/src/workers/`  | Chunk finalization, thumbnails, retention cleanup, storage/reference verification, metadata repair, and migration of legacy files into blob storage. |
+| `native/`               | Electron desktop server host, setup UI, live log panel, LAN URL display, and packaging scripts.                          |
 | PostgreSQL              | Metadata and transactional relationships: users, files, folders, blobs, versions, sessions, shares, activity, and notifications.                     |
 | Redis                   | BullMQ transport, selected caching support, and the WebSocket/event infrastructure transport.                                                        |
 | Filesystem              | Immutable content blobs, temporary upload material, chunk staging, and generated thumbnails.                                                         |
@@ -244,6 +250,7 @@ PostgreSQL and Redis services with health checks and persistent storage.
 | Target                 | Deployment route                                                                                                               | Status                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
 | Docker Compose         | Run the GitHub one-liner above, or run `bash setup.sh` / `setup.bat` from an existing checkout.                                | First-class                    |
+| NexxCloud Server app    | Build `native/release/NexxCloud.Server.Setup.exe`; choose a data folder, then use the in-app LAN URLs and live logs.           | Desktop server package         |
 | Portainer              | Create a Git Repository stack targeting `docker-compose.yml`; paste production variables generated from `.env.example`.       | Compose-compatible             |
 | Coolify                | Add a Docker Compose resource from GitHub, set required variables, and publish only the `frontend` service on port `3000`.     | Compose-compatible             |
 | Dockge                 | Clone locally, run setup once for `.env`, then manage the root Compose stack in Dockge.                                        | Compose-compatible             |
@@ -341,6 +348,23 @@ On PowerShell, create the frontend environment with:
 Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 ```
 
+### Desktop Server Build
+
+The native desktop server host is built from `native/`. It stages the current backend and
+frontend into `native/runtime`, converts the Prisma schema for SQLite, then packages an
+Electron app with the setup window, LAN URL display, and live service logs.
+
+```powershell
+npm ci --prefix native
+npm run --prefix native prepare:runtime
+npm run --prefix native build:host
+native\node_modules\.bin\electron-builder.cmd --projectDir native --win nsis --publish never
+```
+
+The Windows installer is written to `native/release/NexxCloud.Server.Setup.exe`. In the
+desktop runtime, `NEXXCLOUD_NATIVE_RUNTIME=true` disables Redis requirements and uses
+in-process queues/cache instead of the Compose Redis/BullMQ transport.
+
 ## Configuration
 
 | Variable                        | Purpose                                                              | Default or example                       |
@@ -368,6 +392,7 @@ Set-Content .env.local "NEXT_PUBLIC_API_URL=http://localhost:4000"
 | `TRUST_PROXY`                   | Trusted proxy hops for secure forwarding behavior                    | Private/local proxy ranges               |
 | `CORS_ORIGINS`                  | Comma-separated additional HTTPS frontend origins                    | Blank                                    |
 | `HOST_LAN_IP` / `HOST_HOSTNAME` | Values reported by LAN status discovery                              | Set by launch scripts or manually        |
+| `NEXXCLOUD_NATIVE_RUNTIME`      | Internal desktop-server switch for SQLite and in-process queues       | `true` in NexxCloud Server app           |
 
 ## Local Network Access
 
@@ -383,6 +408,11 @@ http://<hostname>.local:3000
 The API publishes both the web service and API service over mDNS. Private IPv4 origins and
 local hostnames are accepted by the API CORS policy. For any network beyond a trusted LAN,
 place NexxCloud behind HTTPS and a reverse proxy.
+
+The desktop NexxCloud Server app also shows LAN dashboard URLs directly under the server
+status. Detection prefers physical Wi-Fi/Ethernet adapters and demotes virtual or host-only
+interfaces such as VirtualBox `192.168.56.*` addresses, so phones and other LAN devices see
+the reachable URL first.
 
 ## Reverse Proxy and HTTPS
 
@@ -432,6 +462,10 @@ docker compose logs --tail=150 backend worker frontend
 curl -fsS http://localhost:4000/health/ready
 curl -fsS http://localhost:3000/health
 ```
+
+For the desktop server, use the built-in **Live Logs** panel for backend, frontend, and
+migration output. **Open Logs** still opens the persisted log directory inside the selected
+NexxCloud data folder.
 
 ## Storage Engine
 
@@ -530,9 +564,11 @@ Important deployment guidance:
 The REST surface covers authentication, files, folders, uploads, versions, sharing,
 signed media, and LAN status. See [API.md](./API.md) for endpoints and request examples.
 
-A WebSocket server and Redis-backed event transport are included at `/ws`. At present,
-the file and folder mutation services do not emit through that event layer, so consumers
-should treat live mutation synchronization as integration work still to be completed.
+A WebSocket server and event transport are included at `/ws`. Compose deployments use
+Redis for cross-process queue and event transport; the desktop server runtime uses
+in-process equivalents. At present, the file and folder mutation services do not emit
+through that event layer, so consumers should treat live mutation synchronization as
+integration work still to be completed.
 
 ## Testing and Quality
 
@@ -570,5 +606,4 @@ media authorization should arrive with tests that exercise failure and cleanup p
 
 ## License
 
-No license file is currently committed in this repository. Add an explicit license before
-publishing or redistributing NexxCloud as an open-source project.
+NexxCloud is released under the [MIT License](./LICENSE). Copyright (c) 2026 Abrar Safin.

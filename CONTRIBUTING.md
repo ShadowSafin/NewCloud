@@ -13,6 +13,7 @@ Read these documents before changing core behavior:
 | [README.md](./README.md)             | Product scope, setup, configuration, and operational overview.        |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Storage invariants, data model, service boundaries, and worker flows. |
 | [API.md](./API.md)                   | HTTP contracts, authentication, uploads, and media delivery.          |
+| [LICENSE](./LICENSE)                 | MIT license terms for use and redistribution.                         |
 
 ## Development Setup
 
@@ -68,6 +69,23 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Native Desktop Server Workflow
+
+Use this path when changing the Electron server host, setup UI, live logs, LAN URL display,
+or desktop installer packaging:
+
+```powershell
+npm ci --prefix native
+npm run --prefix native prepare:runtime
+npm run --prefix native build:host
+native\node_modules\.bin\electron-builder.cmd --projectDir native --win nsis --publish never
+```
+
+The staging step rebuilds the backend/frontend, creates the SQLite native Prisma payload,
+and refreshes `native/runtime`. The packaged server sets `NEXXCLOUD_NATIVE_RUNTIME=true`,
+so backend queue/cache changes must keep both the Redis/BullMQ path and the in-process
+native path working.
+
 ## Codebase Guide
 
 | Path                           | Changes that belong here                                            |
@@ -81,6 +99,8 @@ Open [http://localhost:3000](http://localhost:3000).
 | `frontend/src/lib/`            | Central API and chunk-upload clients.                               |
 | `frontend/src/store/`          | Client-side auth, explorer, upload, clipboard, and toast state.     |
 | `frontend/src/components/`     | User-interface components and application surfaces.                 |
+| `native/src/`                  | Electron host lifecycle, native service spawning, logs, and LAN URLs. |
+| `native/ui/`                   | Desktop server setup window and native-control styling.             |
 
 ## Engineering Rules
 

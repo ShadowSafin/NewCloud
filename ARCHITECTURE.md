@@ -20,6 +20,7 @@ behavior, where an apparently small change can affect persisted files.
 - [Media Delivery and Authentication](#media-delivery-and-authentication)
 - [Workers and Integrity Repair](#workers-and-integrity-repair)
 - [Realtime Infrastructure](#realtime-infrastructure)
+- [Native Desktop Server](#native-desktop-server)
 - [LAN and Reverse Proxy Behavior](#lan-and-reverse-proxy-behavior)
 - [Operational Invariants](#operational-invariants)
 - [Known Boundaries](#known-boundaries)
@@ -84,6 +85,11 @@ NexxCloud/
 |       |-- hooks/
 |       |-- lib/
 |       `-- store/
+|-- native/
+|   |-- src/                      # Electron host, service process control, LAN/log IPC
+|   |-- ui/                       # Native server setup window
+|   |-- scripts/stage-runtime.mjs # Backend/frontend runtime staging for packaging
+|   `-- runtime/                  # Generated packaged runtime payload
 |-- data/                       # bind-mounted application data
 |-- deploy/                     # HTTPS/proxy deployment examples
 |-- docker-compose.yml
@@ -119,6 +125,17 @@ legacy NexxCloud core tables, then resumes normal
 PostgreSQL and Redis health, verifies writable storage, and exposes readiness at
 `/health/ready` only after dependencies respond.
 
+The native desktop server packages a different topology for single-machine use:
+
+| Part                    | Runtime behavior                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| Electron host           | Owns setup, tray actions, backup shortcuts, service lifecycle, LAN URL display, and live log streaming.   |
+| Backend                 | Runs the compiled Express server under Electron's Node runtime on API port `4010`.                       |
+| Frontend                | Runs the Next.js standalone server on the configured dashboard port, defaulting to `3000`.                |
+| Database                | Uses a SQLite schema generated from the Prisma model and stored under the selected data directory.        |
+| Queues/cache            | Uses `NEXXCLOUD_NATIVE_RUNTIME=true` to select in-process queues and an in-memory cache instead of Redis. |
+| Logs                    | Writes backend, frontend, and migration logs to the selected data directory and streams them to the UI.   |
+
 ## Backend Modules
 
 ### HTTP Composition
@@ -131,6 +148,8 @@ PostgreSQL and Redis health, verifies writable storage, and exposes readiness at
 - JSON parsing with BigInt serialization and a 10 MiB JSON body limit.
 - Global and authentication-specific rate limits.
 - Basic-auth protected Bull Board at `/admin/queues`.
+- Native-runtime detection that skips Bull Board and starts in-process workers inside
+  the backend process when packaged by NexxCloud Server.
 - Storage directory initialization and startup integrity job enqueuing.
 - API routers under `/api/*`, plus authenticated legacy media routes under `/files/*`.
 - WebSocket upgrade handling and mDNS service publication.
@@ -479,6 +498,32 @@ The WebSocket server currently supports a query token path and an attempted subp
 path. Query-string authentication is unsuitable for exposed deployments because URLs can
 be logged; hardening this handshake is a pending security task.
 
+## Native Desktop Server
+
+`native/` contains the Electron-based NexxCloud Server host. It is not a separate product
+surface; it packages the same backend and frontend for users who want a Windows desktop
+installer instead of managing Docker services.
+
+`native/scripts/stage-runtime.mjs` builds the backend, converts the Prisma schema from
+PostgreSQL to SQLite for the native runtime, generates a native migration script, installs
+production backend dependencies, builds the Next.js frontend, and copies both standalone
+runtimes into `native/runtime`.
+
+At runtime, the Electron host:
+
+- creates or loads `server-config.json` under Electron user data,
+- generates strong JWT/media secrets for the local installation,
+- runs SQLite migrations before starting services,
+- spawns the backend with `NEXXCLOUD_NATIVE_RUNTIME=true`,
+- spawns the frontend with `INTERNAL_API_URL=http://127.0.0.1:4010`,
+- streams backend, frontend, and migration output into the **Live Logs** panel,
+- persists the same output under `<data-directory>/logs`,
+- displays LAN dashboard URLs using detected private IPv4 addresses.
+
+The native runtime intentionally avoids PostgreSQL and Redis. `backend/src/lib/runtimeQueue.ts`
+maps queue producers and workers to in-process equivalents when `NEXXCLOUD_NATIVE_RUNTIME`
+is enabled, while the normal Compose deployment continues to use Redis and BullMQ.
+
 ## LAN and Reverse Proxy Behavior
 
 ### Local Discovery
@@ -492,6 +537,11 @@ be logged; hardening this handshake is a pending security task.
 
 The authenticated network-status endpoint reports detected IPv4 addresses, a preferred LAN
 address when configured, and a `.local` hostname URL for the frontend.
+
+LAN address selection scores physical Wi-Fi/Ethernet adapters ahead of virtual, VPN,
+container, WSL, and host-only interfaces. VirtualBox-style `192.168.56.*` addresses are
+demoted because they usually are not reachable from phones or other LAN devices. The
+desktop server applies the same intent when rendering dashboard URLs in its setup window.
 
 ### Proxy Deployment
 
