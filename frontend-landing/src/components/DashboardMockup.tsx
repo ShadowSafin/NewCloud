@@ -11,9 +11,9 @@ import {
 
 const previewFiles = [
   {
-    name: "Projects",
+    name: "Folders",
     type: "folder",
-    size: "128 items",
+    size: "12 folders",
     modified: "Today",
     icon: Folder,
     accent: "text-brand-cyan bg-brand-cyan/10",
@@ -146,7 +146,7 @@ export default function DashboardMockup() {
           </div>
 
           <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-zinc-500">
-            Selected: <span className="text-zinc-300">{previewFiles[0].name}</span> - sample {previewFiles[0].type} item
+            Selected: <span className="text-zinc-300">{previewFiles[0].name}</span> - sample folder collection
           </p>
         </div>
       </div>

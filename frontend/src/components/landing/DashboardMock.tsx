@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Folder, FileText, Image as ImageIcon, Film, Music, Upload, Search, Cloud, MoreHorizontal } from "lucide-react";
 
 const files = [
-  { icon: Folder, name: "Projects", meta: "128 items", color: "text-[var(--brand-cyan)]" },
+  { icon: Folder, name: "Folders", meta: "12 folders", color: "text-[var(--brand-cyan)]" },
   { icon: ImageIcon, name: "Photos", meta: "4,201 items", color: "text-[var(--brand-violet)]" },
   { icon: Film, name: "Recordings", meta: "62 items", color: "text-[var(--brand-blue)]" },
   { icon: FileText, name: "Documents", meta: "841 items", color: "text-[var(--brand-cyan)]" },

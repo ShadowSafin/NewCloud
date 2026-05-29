@@ -91,6 +91,8 @@ interface FileState {
   renameFolder: (id: string, name: string) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
   trashFolder: (id: string) => Promise<void>;
+  restoreFolder: (id: string) => Promise<void>;
+  permanentDeleteFolder: (id: string) => Promise<void>;
 
   duplicateFile: (id: string) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -271,8 +273,11 @@ export const useFileStore = create<FileState>((set, get) => ({
   fetchTrash: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await filesApi.listTrash();
-      set({ files: response.data.data, folders: [] });
+      const [filesResponse, foldersResponse] = await Promise.all([
+        filesApi.listTrash(),
+        foldersApi.listTrash(),
+      ]);
+      set({ files: filesResponse.data.data, folders: foldersResponse.data.data });
     } catch (error: any) {
       set({ error: error.response?.data?.error || "Failed to load trash" });
     } finally {
@@ -436,13 +441,15 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   restoreFile: async (id) => {
     const previousFiles = get().files;
+    const previousSelected = get().selectedIds;
     set((state) => ({
       files: state.files.filter((f) => f.id !== id),
+      selectedIds: (() => { const s = new Set(state.selectedIds); s.delete(id); return s; })(),
     }));
     try {
       await filesApi.restore(id);
     } catch (error: any) {
-      set({ files: previousFiles, error: error.response?.data?.error || "Restore failed" });
+      set({ files: previousFiles, selectedIds: previousSelected, error: error.response?.data?.error || "Restore failed" });
       throw error;
     }
   },
@@ -486,6 +493,9 @@ export const useFileStore = create<FileState>((set, get) => ({
         selectedIds: new Set(),
         error: failedCount > 0 ? `${failedCount} item(s) could not be trashed. Already removed or not found.` : null,
       }));
+      if (folderResults.some((r) => r.status === "fulfilled")) {
+        await get().fetchFolderTree();
+      }
     } catch (error: any) {
       set({ error: error.response?.data?.error || "Trash failed" });
     }
@@ -554,8 +564,22 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   emptyTrash: async () => {
     try {
-      await filesApi.emptyTrash();
-      set({ files: [] });
+      const trashedFolders = await foldersApi.listTrash();
+      const folderIds = trashedFolders.data.data.map((folder: FolderItem) => folder.id);
+
+      const results = await Promise.allSettled([
+        filesApi.emptyTrash(),
+        ...folderIds.map((id: string) => foldersApi.permanentDelete(id)),
+      ]);
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        throw new Error(`${failedCount} trash item(s) could not be deleted`);
+      }
+
+      set({ files: [], folders: [], selectedIds: new Set() });
+      if (folderIds.length > 0) {
+        await get().fetchFolderTree();
+      }
     } catch (error: any) {
       set({ error: error.response?.data?.error || "Empty trash failed" });
       throw error;
@@ -619,17 +643,61 @@ export const useFileStore = create<FileState>((set, get) => ({
   trashFolder: async (id) => {
     const previousFolders = get().folders;
     const previousFiles = get().files;
+    const previousSelected = get().selectedIds;
     set((state) => ({
       folders: state.folders.filter((f) => f.id !== id),
       files: state.files.filter((f) => f.folderId !== id),
+      selectedIds: (() => { const s = new Set(state.selectedIds); s.delete(id); return s; })(),
     }));
     try {
       await foldersApi.trash(id);
+      await get().fetchFolderTree();
     } catch (error: any) {
       set({
         folders: previousFolders,
         files: previousFiles,
+        selectedIds: previousSelected,
         error: error.response?.data?.error || "Trash failed",
+      });
+      throw error;
+    }
+  },
+
+  restoreFolder: async (id) => {
+    const previousFolders = get().folders;
+    const previousSelected = get().selectedIds;
+    set((state) => ({
+      folders: state.folders.filter((f) => f.id !== id),
+      selectedIds: (() => { const s = new Set(state.selectedIds); s.delete(id); return s; })(),
+    }));
+    try {
+      await foldersApi.restore(id);
+      await get().fetchFolderTree();
+    } catch (error: any) {
+      set({
+        folders: previousFolders,
+        selectedIds: previousSelected,
+        error: error.response?.data?.error || "Restore failed",
+      });
+      throw error;
+    }
+  },
+
+  permanentDeleteFolder: async (id) => {
+    const previousFolders = get().folders;
+    const previousSelected = get().selectedIds;
+    set((state) => ({
+      folders: state.folders.filter((f) => f.id !== id),
+      selectedIds: (() => { const s = new Set(state.selectedIds); s.delete(id); return s; })(),
+    }));
+    try {
+      await foldersApi.permanentDelete(id);
+      await get().fetchFolderTree();
+    } catch (error: any) {
+      set({
+        folders: previousFolders,
+        selectedIds: previousSelected,
+        error: error.response?.data?.error || "Delete failed",
       });
       throw error;
     }

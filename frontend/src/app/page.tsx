@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import { useFileStore, FileItem } from "@/store/fileStore";
+import { useFileStore, FileItem, FolderItem } from "@/store/fileStore";
 import { useClipboardStore } from "@/store/clipboardStore";
 import { useToastStore } from "@/store/toastStore";
 import { filesApi, foldersApi, filesApiMove, filesApiCopy } from "@/lib/api";
@@ -25,7 +25,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { OperationProgressModal } from "@/components/ui/operation-progress";
 import {
   FileX, Upload, Clock, Star, Trash2, Copy, Scissors, ClipboardPaste,
-  FolderPlus, ArrowLeft, ArrowRight, Folder, Film, FileText, Music, Image, Code,
+  FolderPlus, ArrowLeft, ArrowRight, Folder, Film, FileText, Music, Image,
 } from "lucide-react";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { VirtualizedContainer } from "@/components/file/virtualized-container";
@@ -39,6 +39,7 @@ interface CategoryDef {
   id: string;
   label: string;
   icon: React.ElementType;
+  kind: "files" | "folders";
   categories: FileCategory[];
   colorClass: string;
   glowClass: string;
@@ -76,10 +77,11 @@ async function nativePayloadToFile(payload: NativeUploadFilePayload): Promise<Fi
 
 const CATEGORY_DEFS: CategoryDef[] = [
   {
-    id: "projects",
-    label: "Projects",
+    id: "folders",
+    label: "Folders",
     icon: Folder,
-    categories: ["code", "datasets", "spreadsheets", "presentations", "databases", "cad", "3d-models", "archives", "executables"],
+    kind: "folders",
+    categories: [],
     colorClass: "text-cyan-400",
     glowClass: "glow-cyan",
     bgClass: "bg-cyan-500/5",
@@ -89,6 +91,7 @@ const CATEGORY_DEFS: CategoryDef[] = [
     id: "photos",
     label: "Photos",
     icon: Image,
+    kind: "files",
     categories: ["images"],
     colorClass: "text-purple-400",
     glowClass: "glow-purple",
@@ -99,6 +102,7 @@ const CATEGORY_DEFS: CategoryDef[] = [
     id: "recordings",
     label: "Recordings",
     icon: Film,
+    kind: "files",
     categories: ["videos"],
     colorClass: "text-blue-400",
     glowClass: "glow-blue",
@@ -109,6 +113,7 @@ const CATEGORY_DEFS: CategoryDef[] = [
     id: "documents",
     label: "Documents",
     icon: FileText,
+    kind: "files",
     categories: ["documents", "ebooks"],
     colorClass: "text-emerald-400",
     glowClass: "glow-cyan",
@@ -119,6 +124,7 @@ const CATEGORY_DEFS: CategoryDef[] = [
     id: "audio",
     label: "Audio",
     icon: Music,
+    kind: "files",
     categories: ["audio"],
     colorClass: "text-pink-400",
     glowClass: "glow-magenta",
@@ -143,6 +149,10 @@ function CategoryCard({
   onClick: () => void;
 }) {
   const Icon = def.icon;
+  const countLabel = def.kind === "folders"
+    ? count === 1 ? "folder" : "folders"
+    : count === 1 ? "item" : "items";
+
   return (
     <button
       onClick={onClick}
@@ -174,7 +184,7 @@ function CategoryCard({
       <div className="text-center">
         <p className="text-[13px] font-semibold leading-tight text-white/90 group-hover:text-white sm:text-sm">{def.label}</p>
         <p className="mt-0.5 text-[10px] text-white/40 font-mono sm:text-[11px]">
-          {count} {count === 1 ? "item" : "items"}
+          {count} {countLabel}
         </p>
       </div>
     </button>
@@ -209,7 +219,7 @@ function DashboardContent() {
   const [previewIndex, setPreviewIndex] = useState(0);
   const [localSearch, setLocalSearch] = useState("");
   const [viewFiles, setViewFiles] = useState<FileItem[]>([]);
-  const [viewFolders, setViewFolders] = useState<any[]>([]);
+  const [viewFolders, setViewFolders] = useState<FolderItem[]>([]);
   const [viewLoading, setViewLoading] = useState(false);
   const [confirmBatchTrash, setConfirmBatchTrash] = useState(false);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
@@ -278,20 +288,28 @@ function DashboardContent() {
   }, [view]);
 
   const currentDisplayFiles = isSpecialView ? viewFiles : store.files;
+  const currentDisplayFolders = isSpecialView ? viewFolders : store.folders;
+  const activeCategoryDef = activeCategoryFilter
+    ? CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter)
+    : undefined;
+  const isFolderFilter = activeCategoryDef?.kind === "folders";
 
   // Build category counts from all current files (before category filter)
   const categoryCounts = CATEGORY_DEFS.reduce<Record<string, number>>((acc, def) => {
-    acc[def.id] = currentDisplayFiles.filter(
-      (f) => def.categories.includes(f.category as FileCategory)
-    ).length;
+    acc[def.id] = def.kind === "folders"
+      ? currentDisplayFolders.length
+      : currentDisplayFiles.filter(
+          (f) => def.categories.includes(f.category as FileCategory)
+        ).length;
     return acc;
   }, {});
 
   // Apply category filter then local search
-  const categoryFilteredFiles = activeCategoryFilter
+  const categoryFilteredFiles = isFolderFilter
+    ? []
+    : activeCategoryDef
     ? currentDisplayFiles.filter((f) => {
-        const def = CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter);
-        return def ? def.categories.includes(f.category as FileCategory) : true;
+        return activeCategoryDef.categories.includes(f.category as FileCategory);
       })
     : currentDisplayFiles;
 
@@ -300,6 +318,16 @@ function DashboardContent() {
         f.originalName.toLowerCase().includes(localSearch.toLowerCase())
       )
     : categoryFilteredFiles;
+
+  const folderFilteredFolders = activeCategoryDef && !isFolderFilter
+    ? []
+    : currentDisplayFolders;
+
+  const localFilteredFolders = localSearch
+    ? folderFilteredFolders.filter((f) =>
+        f.name.toLowerCase().includes(localSearch.toLowerCase())
+      )
+    : folderFilteredFolders;
 
   // Fetch data on mount and when folder changes
   useEffect(() => {
@@ -387,10 +415,7 @@ function DashboardContent() {
   };
 
   const sortedFiles = sortItems(isSpecialView ? localFilteredFiles : localFilteredFiles, store.sortBy, store.sortOrder);
-  // Hide folders when a category filter is active (as folders don't have categories)
-  const sortedFolders = activeCategoryFilter
-    ? []
-    : sortItems(isSpecialView ? viewFolders : store.folders, store.sortBy, store.sortOrder);
+  const sortedFolders = sortItems(localFilteredFolders, store.sortBy, store.sortOrder);
 
   const allItems = isSpecialView
     ? (isTrashView
@@ -399,6 +424,36 @@ function DashboardContent() {
     : [...sortedFolders.map((f) => ({ type: "folder" as const, data: f })), ...sortedFiles.map((f) => ({ type: "file" as const, data: f }))];
 
   const selectedCount = store.selectedIds.size;
+
+  const handleSpecialViewItemsRemoved = useCallback((ids: string[]) => {
+    if (!isSpecialView) return;
+    const idSet = new Set(ids);
+    setViewFiles((files) => files.filter((file) => !idSet.has(file.id)));
+    setViewFolders((folders) => folders.filter((folder) => !idSet.has(folder.id)));
+  }, [isSpecialView]);
+
+  const handleSpecialViewItemRemoved = useCallback((id: string) => {
+    handleSpecialViewItemsRemoved([id]);
+  }, [handleSpecialViewItemsRemoved]);
+
+  const deleteSelectedTrashItems = useCallback(async () => {
+    const ids = Array.from(store.selectedIds);
+    const fileIds = ids.filter((id) => viewFiles.some((file) => file.id === id));
+    const folderIds = ids.filter((id) => viewFolders.some((folder) => folder.id === id));
+    const fileResults = await Promise.allSettled(
+      fileIds.map((id) => store.permanentDeleteFile(id).then(() => id))
+    );
+    const folderResults = await Promise.allSettled(
+      folderIds.map((id) => store.permanentDeleteFolder(id).then(() => id))
+    );
+    const succeededIds = [...fileResults, ...folderResults]
+      .filter((result): result is PromiseFulfilledResult<string> => result.status === "fulfilled")
+      .map((result) => result.value);
+    const failedCount = [...fileResults, ...folderResults].filter((result) => result.status === "rejected").length;
+
+    handleSpecialViewItemsRemoved(succeededIds);
+    return { requestedCount: ids.length, deletedCount: succeededIds.length, failedCount };
+  }, [store, viewFiles, viewFolders, handleSpecialViewItemsRemoved]);
 
   // Drag-and-drop handlers
   const handleFileDrop = useCallback(async (items: any[], targetFolderId: string | null) => {
@@ -509,18 +564,17 @@ function DashboardContent() {
   const handlePermanentDelete = useCallback(async () => {
     if (isTrashView && selectedCount > 0) {
       setIsBatchProcessing(true);
-      const ids = Array.from(store.selectedIds);
-      for (const id of ids) {
-        try {
-          const file = store.files.find((f) => f.id === id);
-          if (file) await store.permanentDeleteFile(id);
-        } catch { }
-      }
+      const result = await deleteSelectedTrashItems();
       store.clearSelection();
-      addToast(`Permanently deleted ${ids.length} item(s)`, "success");
+      if (result.deletedCount > 0) {
+        addToast(`Permanently deleted ${result.deletedCount} item(s)`, "success");
+      }
+      if (result.failedCount > 0) {
+        addToast(`${result.failedCount} item(s) could not be deleted`, "error");
+      }
       setIsBatchProcessing(false);
     }
-  }, [store, selectedCount, isTrashView, addToast]);
+  }, [store, selectedCount, isTrashView, addToast, deleteSelectedTrashItems]);
 
   // Duplicate
   const handleDuplicate = useCallback(async () => {
@@ -578,11 +632,21 @@ function DashboardContent() {
   const handleBatchTrash = async () => {
     setIsBatchProcessing(true);
     try {
-      await store.trashMultiple(Array.from(store.selectedIds));
+      if (isTrashView) {
+        const result = await deleteSelectedTrashItems();
+        if (result.deletedCount > 0) {
+          addToast(`Permanently deleted ${result.deletedCount} item(s)`, "success");
+        }
+        if (result.failedCount > 0) {
+          addToast(`${result.failedCount} item(s) could not be deleted`, "error");
+        }
+      } else {
+        await store.trashMultiple(Array.from(store.selectedIds));
+        addToast(`Moved ${selectedCount} item(s) to trash`, "success");
+      }
       store.clearSelection();
-      addToast(`Moved ${selectedCount} item(s) to trash`, "success");
     } catch {
-      addToast("Failed to trash items", "error");
+      addToast(isTrashView ? "Failed to delete items" : "Failed to trash items", "error");
     }
     setIsBatchProcessing(false);
     setConfirmBatchTrash(false);
@@ -593,6 +657,8 @@ function DashboardContent() {
     setIsBatchProcessing(true);
     try {
       await store.emptyTrash();
+      setViewFiles([]);
+      setViewFolders([]);
       addToast("Trash emptied", "success");
     } catch {
       addToast("Failed to empty trash", "error");
@@ -763,7 +829,11 @@ function DashboardContent() {
           {/* Batch selection toolbar */}
           {selectedCount > 0 && (
             <div>
-              <BulkToolbar />
+              <BulkToolbar
+                files={isTrashView ? viewFiles : undefined}
+                folders={isTrashView ? viewFolders : undefined}
+                onItemsRemoved={handleSpecialViewItemsRemoved}
+              />
             </div>
           )}
 
@@ -798,9 +868,8 @@ function DashboardContent() {
                   <Star className="w-7 h-7 text-white/30" />
                 ) : activeCategoryFilter ? (
                   (() => {
-                    const def = CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter);
-                    const Icon = def?.icon ?? FileX;
-                    return <Icon className={`w-7 h-7 ${def?.colorClass ?? "text-white/30"}`} />;
+                    const Icon = activeCategoryDef?.icon ?? FileX;
+                    return <Icon className={`w-7 h-7 ${activeCategoryDef?.colorClass ?? "text-white/30"}`} />;
                   })()
                 ) : (
                   <FileX className="w-7 h-7 text-white/30" />
@@ -813,8 +882,10 @@ function DashboardContent() {
                   ? "No recent files"
                   : isStarredView
                   ? "No starred files"
+                  : isFolderFilter
+                  ? "No folders found"
                   : activeCategoryFilter
-                  ? `No ${CATEGORY_DEFS.find((d) => d.id === activeCategoryFilter)?.label ?? "files"} found`
+                  ? `No ${activeCategoryDef?.label ?? "files"} found`
                   : localSearch
                   ? "No files found"
                   : "No files yet"}
@@ -826,6 +897,8 @@ function DashboardContent() {
                   ? "Your recently uploaded files will appear here"
                   : isStarredView
                   ? "Star your favorite files for quick access"
+                  : isFolderFilter
+                  ? "Create a folder to see it here"
                   : activeCategoryFilter
                   ? "Upload some files to see them here"
                   : localSearch
@@ -839,6 +912,15 @@ function DashboardContent() {
                 >
                   <Upload className="w-4 h-4" />
                   Upload Files
+                </button>
+              )}
+              {!isTrashView && !isRecentView && !isStarredView && !localSearch && isFolderFilter && (
+                <button
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-cyan-400/30 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-400/60 text-cyan-300 text-sm font-medium transition-all duration-300 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  New Folder
                 </button>
               )}
             </div>
@@ -858,6 +940,8 @@ function DashboardContent() {
                     onDragOver={(e) => handleFolderDragOver(e, (item.data as any).id)}
                     onDragLeave={handleFolderDragLeave}
                     onDrop={(e) => handleFolderDrop(e, (item.data as any).id)}
+                    onRemoved={handleSpecialViewItemRemoved}
+                    onRestored={handleSpecialViewItemRemoved}
                   />
                 ) : (
                   <FileCard
@@ -870,6 +954,8 @@ function DashboardContent() {
                     }}
                     isTrashView={isTrashView}
                     draggable
+                    onRemoved={handleSpecialViewItemRemoved}
+                    onRestored={handleSpecialViewItemRemoved}
                   />
                 )
               }
@@ -893,9 +979,13 @@ function DashboardContent() {
       <ConfirmDialog
         open={confirmBatchTrash}
         onOpenChange={setConfirmBatchTrash}
-        title="Move to Trash"
-        description={`${selectedCount} item(s) will be moved to trash.`}
-        confirmLabel="Move to Trash"
+        title={isTrashView ? "Delete Forever" : "Move to Trash"}
+        description={
+          isTrashView
+            ? `${selectedCount} item(s) will be permanently deleted. This cannot be undone.`
+            : `${selectedCount} item(s) will be moved to trash.`
+        }
+        confirmLabel={isTrashView ? "Delete Forever" : "Move to Trash"}
         variant="destructive"
         onConfirm={handleBatchTrash}
         loading={isBatchProcessing}
@@ -904,7 +994,7 @@ function DashboardContent() {
         open={confirmEmptyTrash}
         onOpenChange={setConfirmEmptyTrash}
         title="Empty Trash"
-        description="All files in trash will be permanently deleted. This cannot be undone."
+        description="All files and folders in trash will be permanently deleted. This cannot be undone."
         confirmLabel="Empty Trash"
         variant="destructive"
         onConfirm={handleEmptyTrash}

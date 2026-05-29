@@ -30,12 +30,14 @@ interface FileCardProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  onRemoved?: (id: string) => void;
+  onRestored?: (id: string) => void;
 }
 
 export function FileCard({
   file, viewMode, onPreview, isTrashView,
   isSelected: isSelectedProp, onSelect, onContextMenu: onContextMenuProp,
-  draggable, onDragStart,
+  draggable, onDragStart, onRemoved, onRestored,
 }: FileCardProps) {
   const store = useFileStore();
   const { downloadFile, trashFile, restoreFile, permanentDeleteFile, selectedIds, toggleSelect, duplicateFile } = store;
@@ -90,6 +92,8 @@ export function FileCard({
     setIsProcessing(true);
     try {
       await trashFile(file.id);
+      setConfirmDelete(false);
+      onRemoved?.(file.id);
       addToast(`"${file.originalName}" moved to trash`, "success");
     } catch {
       addToast("Failed to trash file", "error");
@@ -101,11 +105,26 @@ export function FileCard({
     setIsProcessing(true);
     try {
       await permanentDeleteFile(file.id);
+      setConfirmPermanent(false);
+      onRemoved?.(file.id);
       addToast(`"${file.originalName}" permanently deleted`, "success");
     } catch {
       addToast("Failed to delete file", "error");
     }
     setIsProcessing(false);
+  };
+
+  const handleRestore = async () => {
+    setIsProcessing(true);
+    try {
+      await restoreFile(file.id);
+      onRestored?.(file.id);
+      addToast(`"${file.originalName}" restored`, "success");
+    } catch {
+      addToast("Failed to restore file", "error");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDuplicate = async () => {
@@ -134,7 +153,7 @@ export function FileCard({
   const getContextMenuItems = (): ContextMenuItem[] => {
     if (isTrashView) {
       return [
-        { label: "Restore", icon: <RotateCcw className="w-4 h-4" />, onClick: () => restoreFile(file.id) },
+        { label: "Restore", icon: <RotateCcw className="w-4 h-4" />, onClick: handleRestore },
         { divider: true, label: "", onClick: () => {} },
         { label: "Delete Forever", icon: <Trash2 className="w-4 h-4" />, onClick: () => setConfirmPermanent(true), destructive: true },
       ];
@@ -349,24 +368,37 @@ export function FileCard({
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Favorite">
-          <Star className={cn("w-3.5 h-3.5", isFavorite ? "fill-yellow-400 text-yellow-400" : "text-white/60 hover:text-white")} />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Download">
-          <Download className="w-3.5 h-3.5 text-white/60 hover:text-white" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Share">
-          <Share2 className="w-3.5 h-3.5 text-white/60 hover:text-white" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); setIsRenameOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Rename">
-          <Pencil className="w-3.5 h-3.5 text-white/60 hover:text-white" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); setIsMoveOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Move to">
-          <FolderInput className="w-3.5 h-3.5 text-white/60 hover:text-white" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-red-500/20 hover:border-red-500/30 transition-all" title="Move to Trash">
-          <Trash2 className="w-3.5 h-3.5 text-white/60 hover:text-red-400" />
-        </button>
+        {isTrashView ? (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); handleRestore(); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Restore">
+              <RotateCcw className="w-3.5 h-3.5 text-white/60 hover:text-white" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setConfirmPermanent(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-red-500/20 hover:border-red-500/30 transition-all" title="Delete Forever">
+              <Trash2 className="w-3.5 h-3.5 text-white/60 hover:text-red-400" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(e); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Favorite">
+              <Star className={cn("w-3.5 h-3.5", isFavorite ? "fill-yellow-400 text-yellow-400" : "text-white/60 hover:text-white")} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Download">
+              <Download className="w-3.5 h-3.5 text-white/60 hover:text-white" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Share">
+              <Share2 className="w-3.5 h-3.5 text-white/60 hover:text-white" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setIsRenameOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Rename">
+              <Pencil className="w-3.5 h-3.5 text-white/60 hover:text-white" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setIsMoveOpen(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all" title="Move to">
+              <FolderInput className="w-3.5 h-3.5 text-white/60 hover:text-white" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} className="p-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-red-500/20 hover:border-red-500/30 transition-all" title="Move to Trash">
+              <Trash2 className="w-3.5 h-3.5 text-white/60 hover:text-red-400" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Dialogs */}
