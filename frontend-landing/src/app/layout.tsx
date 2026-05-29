@@ -66,6 +66,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full">
       <head>
+        <meta name="monetag" content="dc6b37311e7a62779a22b592cabd7aaa" />
         <Script id="google-tag-manager" strategy="beforeInteractive">
           {`
             (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
